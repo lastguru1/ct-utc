@@ -1,9 +1,20 @@
+# Cryptotrader Universal Trading Constructor bot
+# Copyright (c) 2017, Dmitry Golubev
+# All rights reserved.
+# 
+# This software uses BSD 2-clause "Simplified" License: https://github.com/lastguru1/ct-utc/blob/master/LICENSE
+# 
+# Newest version of the software is available here: https://github.com/lastguru1/ct-utc
+
 talib = require "talib"
 trading = require "trading"
 params = require 'params'
 
-# Strategy definition. If entered, all other options are ignored. Used for fast parameter reuse and sharing
+# Strategy definition. If entered, all other options are ignored. Used for fast parameter reuse and sharing.
 # STRATEGY = params.add 'Strategy definition', ''
+
+# We can use crossings and/or oscillator to detect opportunities
+OSC_MODE = params.addOptions 'Mode', ['Crossing only', 'Oscillator only', 'Any'], 'Any'
 
 # What data input to use for MAs that only take one input: Close Price or Weighted Close Price
 DATA_INPUT = params.addOptions 'Data input', ['Close', 'Weighted'], 'Close'
@@ -30,32 +41,56 @@ SHORT_MA_P = params.add 'Short MA period', '10'
 LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'SMA'
 LONG_MA_P = params.add 'Long MA period', '10'
 
-# Feedback can be applied on the price data used by LONG MA calculations
-# First type is when we will calculate ShortFeedbackDelta and add it to the prices
-# Second type is when we add volume data and add it to the prices
-# Unlike Delta, Volume does not have a sign, no one needs to be chosen
-#  either from price change, or from Short MA change. Volume can also be read from OBV
+# Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
+# Delta feedback works like that:
+# - calculate Feedback line using the given MA
+# - calculate Short-Feedback delta
+# - add the resulting delta to the price data to be used by LONG MA later
+# Volume feedback works like that:
+# - decide, which sign (positive or negative) would each of the volume data points have
+#   (as volume does not have any sign at the beginning - it is always positive);
+#   NB: instead of volume data, OBV can be used - it is signed, so it is usable as is
+# - add the resulting data to the price data to be used bu LONG MA later
 # The feedback can be modified (reduced) before being added
-FEED_DELTA_T = params.addOptions 'Delta feedback reduction type', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
+FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'SMA'
 FEED_MA_P = params.add 'Delta feedback MA period', '10'
-#FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
-#FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
-#FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA', 'Feedback MA', 'OBV'], 'Price'
+FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
+FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
+FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA', 'Feedback MA', 'ShortFeedbackDelta', 'OBV'], 'Price'
 
-# MACD MA
+# MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
+# MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
 MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period', '10'
-
-# Use Money Flow Index for additional actions
-# USE_MFI = params.add 'MFI cutoff for extremes (0 - disabled)', 0
 
 # High and low thresholds
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
 
+# Which oscillator to use
+# Money Flow Index seems like the best one, but some may prefer Relative Strength Index
+OSC_TYPE = params.addOptions 'Oscillator type', ['MFI', 'RSI'], 'MFI'
+OSC_THRESHOLD = params.add 'Oscillator cutoff', 0
+OSC_PERIOD = params.add 'Oscillator period', 10
+
+# We may want to smooth the oscillator results a bit
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'WMA'
+OSC_MA_P = params.add 'Oscillator MA period', '2'
+
+# What trigger to use for oscillator
+# Early: trigger once crossed
+# Extreme: trigger once change direction (provisional top/bottom) after crossing
+# Late: trigger when back within the bounds after crossing
+OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late'], 'Late'
+
+# TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
+
 REDUCE_BY = 1
+
+feedbackSign = (n) ->
+	return Math.sign(n)
 
 feedbackDivide = (n) ->
 	return n/REDUCE_BY
@@ -235,6 +270,15 @@ init: ->
 		LowThreshold:
 			color: 'lightpink'
 			secondary: true
+		HighOsc:
+			color: 'darkyellow'
+			secondary: true
+		LowOsc:
+			color: 'darkyellow'
+			secondary: true
+		Oscillator:
+			color: 'yellow'
+			secondary: true
 
 handle: ->
 	instrument = @data.instruments[0]
@@ -280,6 +324,72 @@ handle: ->
 			inReal1: feedDelta
 			startIdx: 0
 			endIdx: feedDelta.length-1
+	
+	if FEED_VOLUME_T isnt 'NONE'
+		if FEED_VOLUME_S isnt 'OBV'
+			switch FEED_VOLUME_S
+				when 'Price'
+					priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
+					priceNew = _.drop(processMA('NONE', 0, instrument), 1)
+				when 'Short MA'
+					priceOld = _.dropRight(short, 1)
+					priceNew = _.drop(short, 1)
+				when 'Feedback MA'
+					priceOld = _.dropRight(feedback, 1)
+					priceNew = _.drop(feedback, 1)
+				when 'ShortFeedbackDelta'
+					priceOld = _.dropRight(shortFeedbackDelta, 1)
+					priceNew = _.drop(shortFeedbackDelta, 1)
+			
+			priceDiff = talib.SUB
+				inReal0: priceNew
+				inReal1: priceOld
+				startIdx: 0
+				endIdx: priceOld.length-1
+			signs = _.map(priceDiff, feedbackSign)
+			volume = instrument.volume
+			if signs.length > volume.length
+				signs = _.drop(signs, signs.length - volume.length)
+			if volume.length > signs.length
+				volume = _.drop(volume, volume.length - signs.length)
+			volume = talib.MULT
+				inReal0: signs
+				inReal1: volume
+				startIdx: 0
+				endIdx: signs.length-1
+		else
+			price = processMA('NONE', 0, instrument)
+			volume = instrument.volume
+			if price.length > volume.length
+				price = _.drop(price, price.length - volume.length)
+			if volume.length > price.length
+				volume = _.drop(volume, volume.length - price.length)
+			volume = talib.OBV
+				inReal: price
+				volume: volume
+				startIdx: 0
+				endIdx: signs.length-1
+		
+		REDUCE_BY = FEED_VOLUME_P
+		switch FEED_VOLUME_T
+			when 'Division'
+				feedVolume = _.map(volume, feedbackDivide)
+			when 'Root'
+				feedVolume = _.map(volume, feedbackRoot)
+			when 'Logarithm'
+				feedVolume = _.map(volume, feedbackLog)
+		
+		if lInput.length > feedVolume.length
+			lInput = _.drop(lInput, lInput.length - feedVolume.length)
+		if short.length > lInput.length
+			feedVolume = _.drop(feedVolume, feedVolume.length - lInput.length)
+		lInput = talib.ADD
+			inReal0: lInput
+			inReal1: feedVolume
+			startIdx: 0
+			endIdx: feedVolume.length-1
+	
+	if FEED_VOLUME_T isnt 'NONE' or FEED_DELTA_T isnt 'NONE'
 		plot
 			Feedback: _.last(feedback)
 			ShortFeedbackDelta: _.last(shortFeedbackDelta)
@@ -312,10 +422,3 @@ handle: ->
 			endIdx: macd.length-1
 		plot
 			MACD: _.last(macdDelta)
-
-	#	if _.last(shortLongDelta) > HI_THRESHOLD
-	#		storage.sldHi = 1
-	#	else if storage.sldHi is 1 and _.last(shortLongDelta) > LO_THRESHOLD
-	#		storage.sldHi = 1
-	#	else
-	#		storage.sldHi = 0
