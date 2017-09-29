@@ -72,8 +72,8 @@ LO_THRESHOLD = params.add 'Low threshold', -1.5
 # Which oscillator to use
 # Money Flow Index seems like the best one, but some may prefer Relative Strength Index
 OSC_TYPE = params.addOptions 'Oscillator type', ['MFI', 'RSI'], 'MFI'
-OSC_THRESHOLD = params.add 'Oscillator cutoff', 0
-OSC_PERIOD = params.add 'Oscillator period', 10
+OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
+OSC_PERIOD = params.add 'Oscillator period', 14
 
 # We may want to smooth the oscillator results a bit
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'WMA'
@@ -286,139 +286,165 @@ handle: ->
 	#	storage.sldHi ?= 0
 	debug "price: #{instrument.close[instrument.close.length-1]} #{instrument.base().toUpperCase()} at #{new Date(data.at)}"
 	
-	short = processMA(SHORT_MA_T, SHORT_MA_P, instrument)
 	plot
-		HighThreshold: HI_THRESHOLD
 		Zero: 0
-		LowThreshold: LO_THRESHOLD
-		Short: _.last(short)
 	
-	lInput = processMA('NONE', 0, instrument)
-	if FEED_DELTA_T isnt 'NONE'
-		feedback = processMA(FEED_MA_T, FEED_MA_P, instrument)
-		if feedback.length > short.length
-			feedback = _.drop(feedback, feedback.length - short.length)
-		if short.length > feedback.length
-			short = _.drop(short, short.length - feedback.length)
-		shortFeedbackDelta = talib.SUB
-			inReal0: short
-			inReal1: feedback
-			startIdx: 0
-			endIdx: feedback.length-1
+	if OSC_MODE isnt 'Oscillator only'
+		short = processMA(SHORT_MA_T, SHORT_MA_P, instrument)
+		lInput = processMA('NONE', 0, instrument)
+		plot
+			HighThreshold: HI_THRESHOLD
+			LowThreshold: LO_THRESHOLD
+			Short: _.last(short)
+		if FEED_DELTA_T isnt 'NONE'
+			feedback = processMA(FEED_MA_T, FEED_MA_P, instrument)
+			if feedback.length > short.length
+				feedback = _.drop(feedback, feedback.length - short.length)
+			if short.length > feedback.length
+				short = _.drop(short, short.length - feedback.length)
+			shortFeedbackDelta = talib.SUB
+				inReal0: short
+				inReal1: feedback
+				startIdx: 0
+				endIdx: feedback.length-1
 		
-		REDUCE_BY = FEED_DELTA_P
-		switch FEED_DELTA_T
-			when 'Division'
-				feedDelta = _.map(shortFeedbackDelta, feedbackDivide)
-			when 'Root'
-				feedDelta = _.map(shortFeedbackDelta, feedbackRoot)
-			when 'Logarithm'
-				feedDelta = _.map(shortFeedbackDelta, feedbackLog)
+			REDUCE_BY = FEED_DELTA_P
+			switch FEED_DELTA_T
+				when 'Division'
+					feedDelta = _.map(shortFeedbackDelta, feedbackDivide)
+				when 'Root'
+					feedDelta = _.map(shortFeedbackDelta, feedbackRoot)
+				when 'Logarithm'
+					feedDelta = _.map(shortFeedbackDelta, feedbackLog)
 		
-		if lInput.length > feedDelta.length
-			lInput = _.drop(lInput, lInput.length - feedDelta.length)
-		if short.length > lInput.length
-			feedDelta = _.drop(feedDelta, feedDelta.length - lInput.length)
-		lInput = talib.ADD
-			inReal0: lInput
-			inReal1: feedDelta
-			startIdx: 0
-			endIdx: feedDelta.length-1
+			if lInput.length > feedDelta.length
+				lInput = _.drop(lInput, lInput.length - feedDelta.length)
+			if short.length > lInput.length
+				feedDelta = _.drop(feedDelta, feedDelta.length - lInput.length)
+			lInput = talib.ADD
+				inReal0: lInput
+				inReal1: feedDelta
+				startIdx: 0
+				endIdx: feedDelta.length-1
 	
-	if FEED_VOLUME_T isnt 'NONE'
-		if FEED_VOLUME_S isnt 'OBV'
-			switch FEED_VOLUME_S
-				when 'Price'
-					priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
-					priceNew = _.drop(processMA('NONE', 0, instrument), 1)
-				when 'Short MA'
-					priceOld = _.dropRight(short, 1)
-					priceNew = _.drop(short, 1)
-				when 'Feedback MA'
-					priceOld = _.dropRight(feedback, 1)
-					priceNew = _.drop(feedback, 1)
-				when 'ShortFeedbackDelta'
-					priceOld = _.dropRight(shortFeedbackDelta, 1)
-					priceNew = _.drop(shortFeedbackDelta, 1)
+		if FEED_VOLUME_T isnt 'NONE'
+			if FEED_VOLUME_S isnt 'OBV'
+				switch FEED_VOLUME_S
+					when 'Price'
+						priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
+						priceNew = _.drop(processMA('NONE', 0, instrument), 1)
+					when 'Short MA'
+						priceOld = _.dropRight(short, 1)
+						priceNew = _.drop(short, 1)
+					when 'Feedback MA'
+						priceOld = _.dropRight(feedback, 1)
+						priceNew = _.drop(feedback, 1)
+					when 'ShortFeedbackDelta'
+						priceOld = _.dropRight(shortFeedbackDelta, 1)
+						priceNew = _.drop(shortFeedbackDelta, 1)
 			
-			priceDiff = talib.SUB
-				inReal0: priceNew
-				inReal1: priceOld
-				startIdx: 0
-				endIdx: priceOld.length-1
-			signs = _.map(priceDiff, feedbackSign)
-			volume = instrument.volume
-			if signs.length > volume.length
-				signs = _.drop(signs, signs.length - volume.length)
-			if volume.length > signs.length
-				volume = _.drop(volume, volume.length - signs.length)
-			volume = talib.MULT
-				inReal0: signs
-				inReal1: volume
-				startIdx: 0
-				endIdx: signs.length-1
-		else
-			price = processMA('NONE', 0, instrument)
-			volume = instrument.volume
-			if price.length > volume.length
-				price = _.drop(price, price.length - volume.length)
-			if volume.length > price.length
-				volume = _.drop(volume, volume.length - price.length)
-			volume = talib.OBV
-				inReal: price
-				volume: volume
-				startIdx: 0
-				endIdx: signs.length-1
+				priceDiff = talib.SUB
+					inReal0: priceNew
+					inReal1: priceOld
+					startIdx: 0
+					endIdx: priceOld.length-1
+				signs = _.map(priceDiff, feedbackSign)
+				volume = instrument.volume
+				if signs.length > volume.length
+					signs = _.drop(signs, signs.length - volume.length)
+				if volume.length > signs.length
+					volume = _.drop(volume, volume.length - signs.length)
+				volume = talib.MULT
+					inReal0: signs
+					inReal1: volume
+					startIdx: 0
+					endIdx: signs.length-1
+			else
+				price = processMA('NONE', 0, instrument)
+				volume = instrument.volume
+				if price.length > volume.length
+					price = _.drop(price, price.length - volume.length)
+				if volume.length > price.length
+					volume = _.drop(volume, volume.length - price.length)
+				volume = talib.OBV
+					inReal: price
+					volume: volume
+					startIdx: 0
+					endIdx: signs.length-1
 		
-		REDUCE_BY = FEED_VOLUME_P
-		switch FEED_VOLUME_T
-			when 'Division'
-				feedVolume = _.map(volume, feedbackDivide)
-			when 'Root'
-				feedVolume = _.map(volume, feedbackRoot)
-			when 'Logarithm'
-				feedVolume = _.map(volume, feedbackLog)
+			REDUCE_BY = FEED_VOLUME_P
+			switch FEED_VOLUME_T
+				when 'Division'
+					feedVolume = _.map(volume, feedbackDivide)
+				when 'Root'
+					feedVolume = _.map(volume, feedbackRoot)
+				when 'Logarithm'
+					feedVolume = _.map(volume, feedbackLog)
 		
-		if lInput.length > feedVolume.length
-			lInput = _.drop(lInput, lInput.length - feedVolume.length)
-		if short.length > lInput.length
-			feedVolume = _.drop(feedVolume, feedVolume.length - lInput.length)
-		lInput = talib.ADD
-			inReal0: lInput
-			inReal1: feedVolume
+			if lInput.length > feedVolume.length
+				lInput = _.drop(lInput, lInput.length - feedVolume.length)
+			if short.length > lInput.length
+				feedVolume = _.drop(feedVolume, feedVolume.length - lInput.length)
+			lInput = talib.ADD
+				inReal0: lInput
+				inReal1: feedVolume
+				startIdx: 0
+				endIdx: feedVolume.length-1
+	
+		if FEED_VOLUME_T isnt 'NONE' or FEED_DELTA_T isnt 'NONE'
+			plot
+				Feedback: _.last(feedback)
+				ShortFeedbackDelta: _.last(shortFeedbackDelta)
+				CorrectedPrice: _.last(lInput)
+	
+		long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+		if long.length > short.length
+			long = _.drop(long, long.length - short.length)
+		if short.length > long.length
+			short = _.drop(short, short.length - long.length)
+		shortLongDelta = talib.SUB
+			inReal0: short
+			inReal1: long
 			startIdx: 0
-			endIdx: feedVolume.length-1
-	
-	if FEED_VOLUME_T isnt 'NONE' or FEED_DELTA_T isnt 'NONE'
+			endIdx: long.length-1
 		plot
-			Feedback: _.last(feedback)
-			ShortFeedbackDelta: _.last(shortFeedbackDelta)
-			CorrectedPrice: _.last(lInput)
+			Long: _.last(long)
+			ShortLongDelta: _.last(shortLongDelta)
 	
-	long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
-	if long.length > short.length
-		long = _.drop(long, long.length - short.length)
-	if short.length > long.length
-		short = _.drop(short, short.length - long.length)
-	shortLongDelta = talib.SUB
-		inReal0: short
-		inReal1: long
-		startIdx: 0
-		endIdx: long.length-1
-	plot
-		Long: _.last(long)
-		ShortLongDelta: _.last(shortLongDelta)
+		if MACD_MA_T isnt 'NONE'
+			macd = processMA(MACD_MA_T, MACD_MA_P, shortLongDelta, true)
+			if macd.length > shortLongDelta.length
+				macd = _.drop(macd, macd.length - shortLongDelta.length)
+			if shortLongDelta.length > macd.length
+				shortLongDelta = _.drop(shortLongDelta, shortLongDelta.length - macd.length)
+			macdDelta = talib.SUB
+				inReal0: shortLongDelta
+				inReal1: macd
+				startIdx: 0
+				endIdx: macd.length-1
+			plot
+				MACD: _.last(macdDelta)
 	
-	if MACD_MA_T isnt 'NONE'
-		macd = processMA(MACD_MA_T, MACD_MA_P, shortLongDelta, true)
-		if macd.length > shortLongDelta.length
-			macd = _.drop(macd, macd.length - shortLongDelta.length)
-		if shortLongDelta.length > macd.length
-			shortLongDelta = _.drop(shortLongDelta, shortLongDelta.length - macd.length)
-		macdDelta = talib.SUB
-			inReal0: shortLongDelta
-			inReal1: macd
-			startIdx: 0
-			endIdx: macd.length-1
+	if OSC_MODE isnt 'Crossing only'
+		switch OSC_TYPE
+			when 'MFI'
+				osc = talib.MFI
+					high: instrument.high
+					low: instrument.low
+					close: instrument.close
+					volume: instrument.volume
+					startIdx: 0
+					endIdx: instrument.close.length-1
+					optInTimePeriod: OSC_PERIOD
+			when 'RSI'
+				osc = talib.RSI
+					inReal: processMA('NONE', 0, instrument)
+					startIdx: 0
+					endIdx: instrument.close.length-1
+					optInTimePeriod: OSC_PERIOD
+		
+		osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 		plot
-			MACD: _.last(macdDelta)
+			HighOsc: 100 - OSC_THRESHOLD
+			LowOsc: OSC_THRESHOLD
+			Oscillator: _.last(osc)
