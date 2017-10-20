@@ -17,7 +17,7 @@ params = require 'params'
 OSC_MODE = params.addOptions 'Mode', ['Crossing only', 'Oscillator only', 'Any'], 'Any'
 
 # What data input to use for MAs that only take one input: Close Price or Weighted Close Price
-DATA_INPUT = params.addOptions 'Data input', ['Close', 'Weighted'], 'Close'
+DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], 'Close'
 
 # The following MAs can be used:
 # SMA  - Simple Moving Average
@@ -34,11 +34,11 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Weighted'], 'Close'
 # HT - Hilbert Transform - Instantaneous Trendline
 
 # Short MA
-SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'SMA'
+SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'SMA'
 SHORT_MA_P = params.add 'Short MA period', '10'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'SMA'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'SMA'
 LONG_MA_P = params.add 'Long MA period', '10'
 
 # Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
@@ -62,7 +62,7 @@ FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'NONE'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period', '10'
 
 # High and low thresholds
@@ -71,12 +71,12 @@ LO_THRESHOLD = params.add 'Low threshold', -1.5
 
 # Which oscillator to use
 # Money Flow Index seems like the best one, but some may prefer Relative Strength Index
-OSC_TYPE = params.addOptions 'Oscillator type', ['MFI', 'RSI'], 'MFI'
+OSC_TYPE = params.addOptions 'Oscillator type', ['MFI', 'RSI', 'LRSI', 'LMFI'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
-OSC_PERIOD = params.add 'Oscillator period', 14
+OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', 14
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'WMA'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'WMA'
 OSC_MA_P = params.add 'Oscillator MA period', '2'
 
 # What trigger to use for oscillator
@@ -88,6 +88,9 @@ OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late
 # TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
 
 REDUCE_BY = 1
+
+LINIT = [0,0,0,0]
+LGAMMA = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -101,12 +104,53 @@ feedbackRoot = (n) ->
 feedbackLog = (n) ->
 	return Math.sign(n) * Math.log(Math.abs(n)) / Math.log(REDUCE_BY)
 
+LaguerreMA = (n) ->
+	L0 = (1 - LGAMMA) * n + LGAMMA * LINIT[0]
+	L1 = -LGAMMA * L0 + LINIT[0] + LGAMMA * LINIT[1]
+	L2 = -LGAMMA * L1 + LINIT[1] + LGAMMA * LINIT[2]
+	L3 = -LGAMMA * L2 + LINIT[2] + LGAMMA * LINIT[3]
+	LINIT = [L0, L1, L2, L3]
+	return (L0 + 2*L1 + 2*L2 + L3) / 6
+
+LaguerreRSI = (n) ->
+	L0 = (1 - LGAMMA) * n + LGAMMA * LINIT[0]
+	L1 = -LGAMMA * L0 + LINIT[0] + LGAMMA * LINIT[1]
+	L2 = -LGAMMA * L1 + LINIT[1] + LGAMMA * LINIT[2]
+	L3 = -LGAMMA * L2 + LINIT[2] + LGAMMA * LINIT[3]
+	LINIT = [L0, L1, L2, L3]
+	cu = 0
+	cd = 0
+	if L0 >= L1
+		cu = L0 - L1
+	else
+		cd = L1 = L0
+	if L1 >= L2
+		cu = cu + L1 - L2
+	else
+		cd = cd + L2 - L1
+	if L2 >= L3
+		cu = cu + L2 - L3
+	else
+		cd = cd + L3 - L2
+	if cu + cd is 0
+		lrsi = 0
+	else
+		lrsi = cu / (cu + cd)
+	return lrsi
+
 processMA = (selector, period, instrument, secondary = false) ->
 	if secondary
 		sInput = instrument
 	else if DATA_INPUT is 'Close'
 		sInput = instrument.close
-	else
+	else if DATA_INPUT is 'Typical'
+		sInput = talib.TYPPRICE
+			high: instrument.high
+			low: instrument.low
+			close: instrument.close
+			startIdx: 0
+			endIdx: instrument.close.length-1
+	else 
 		sInput = talib.WCLPRICE
 			high: instrument.high
 			low: instrument.low
@@ -233,6 +277,47 @@ processMA = (selector, period, instrument, secondary = false) ->
 				inReal: sInput
 				startIdx: 0
 				endIdx: sInput.length-1
+		when 'Laguerre'
+			LINIT = [0,0,0,0]
+			LGAMMA = period
+			_.map(sInput, LaguerreMA)
+
+processOSC = (selector, period, instrument) ->
+	switch OSC_TYPE
+		when 'MFI'
+			talib.MFI
+				high: instrument.high
+				low: instrument.low
+				close: instrument.close
+				volume: instrument.volumes
+				startIdx: 0
+				endIdx: instrument.close.length-1
+				optInTimePeriod: OSC_PERIOD
+		when 'RSI'
+			talib.RSI
+				inReal: processMA('NONE', 0, instrument)
+				startIdx: 0
+				endIdx: instrument.close.length-1
+				optInTimePeriod: OSC_PERIOD
+		when 'LRSI'
+			LINIT = [0,0,0,0]
+			LGAMMA = OSC_PERIOD
+			price = processMA('NONE', 0, instrument)
+			lrsi = _.map(price, LaguerreRSI)
+			REDUCE_BY = 0.01
+			_.map(lrsi, feedbackDivide)
+		
+		when 'LMFI'
+			LINIT = [0,0,0,0]
+			LGAMMA = OSC_PERIOD
+			price = talib.MULT
+				inReal0: processMA('NONE', 0, instrument)
+				inReal1: instrument.volumes
+				startIdx: 0
+				endIdx: instrument.volumes.length-1
+			lmfi = _.map(price, LaguerreRSI)
+			REDUCE_BY = 0.01
+			_.map(lmfi, feedbackDivide)
 
 init: ->
 	# All the plotlines
@@ -277,7 +362,7 @@ init: ->
 			color: 'darkyellow'
 			secondary: true
 		Oscillator:
-			color: 'yellow'
+			color: 'darkyellow'
 			secondary: true
 
 handle: ->
@@ -349,7 +434,7 @@ handle: ->
 					startIdx: 0
 					endIdx: priceOld.length-1
 				signs = _.map(priceDiff, feedbackSign)
-				volume = instrument.volume
+				volume = instrument.volumes
 				if signs.length > volume.length
 					signs = _.drop(signs, signs.length - volume.length)
 				if volume.length > signs.length
@@ -361,7 +446,7 @@ handle: ->
 					endIdx: signs.length-1
 			else
 				price = processMA('NONE', 0, instrument)
-				volume = instrument.volume
+				volume = instrument.volumes
 				if price.length > volume.length
 					price = _.drop(price, price.length - volume.length)
 				if volume.length > price.length
@@ -426,25 +511,16 @@ handle: ->
 				MACD: _.last(macdDelta)
 	
 	if OSC_MODE isnt 'Crossing only'
-		switch OSC_TYPE
-			when 'MFI'
-				osc = talib.MFI
-					high: instrument.high
-					low: instrument.low
-					close: instrument.close
-					volume: instrument.volume
-					startIdx: 0
-					endIdx: instrument.close.length-1
-					optInTimePeriod: OSC_PERIOD
-			when 'RSI'
-				osc = talib.RSI
-					inReal: processMA('NONE', 0, instrument)
-					startIdx: 0
-					endIdx: instrument.close.length-1
-					optInTimePeriod: OSC_PERIOD
-		
+		osc = processOSC(OSC_TYPE, OSC_PERIOD, instrument)
 		osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 		plot
 			HighOsc: 100 - OSC_THRESHOLD
 			LowOsc: OSC_THRESHOLD
 			Oscillator: _.last(osc)
+
+	#	if _.last(shortLongDelta) > HI_THRESHOLD
+	#		storage.sldHi = 1
+	#	else if storage.sldHi is 1 and _.last(shortLongDelta) > LO_THRESHOLD
+	#		storage.sldHi = 1
+	#	else
+	#		storage.sldHi = 0
