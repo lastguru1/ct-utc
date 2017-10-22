@@ -27,19 +27,21 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # TEMA - Triple Exponential Moving Average
 # TRIMA - Triangular Moving Average
 # KAMA - Kaufman Adaptive Moving Average
-# MAMA - MESA Adaptive Moving Average
-# FAMA - Following Adaptive Moving Average
+# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1), slow limit (0..1))
+# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1), slow limit (0..1))
 # T3 - Triple Exponential Moving Average
 # HMA - Hull Moving Average
 # HT - Hilbert Transform - Instantaneous Trendline
+# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1))
+# FRAMA - Fractal Adaptive Moving Average (parameters: length, slow pariod)
 
 # Short MA
-SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'SMA'
-SHORT_MA_P = params.add 'Short MA period', '10'
+SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+SHORT_MA_P = params.add 'Short MA period or parameters', '10'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'SMA'
-LONG_MA_P = params.add 'Long MA period', '10'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+LONG_MA_P = params.add 'Long MA period or parameters', '10'
 
 # Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
 # Delta feedback works like that:
@@ -54,7 +56,7 @@ LONG_MA_P = params.add 'Long MA period', '10'
 # The feedback can be modified (reduced) before being added
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
-FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT'], 'SMA'
+FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
 FEED_MA_P = params.add 'Delta feedback MA period', '10'
 FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
@@ -62,7 +64,7 @@ FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'NONE'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period', '10'
 
 # High and low thresholds
@@ -76,14 +78,14 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', 14
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre'], 'WMA'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
 OSC_MA_P = params.add 'Oscillator MA period', '2'
 
 # What trigger to use for oscillator
 # Early: trigger once crossed
 # Extreme: trigger once change direction (provisional top/bottom) after crossing
 # Late: trigger when back within the bounds after crossing
-OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late'], 'Late'
+OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
 # TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
 
@@ -91,6 +93,9 @@ REDUCE_BY = 1
 
 LINIT = [0,0,0,0]
 LGAMMA = 0
+FRAMA_LEN = 0
+FRAMA_SLOW = 0
+FRAMA_PREV = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -104,7 +109,8 @@ feedbackRoot = (n) ->
 feedbackLog = (n) ->
 	return Math.sign(n) * Math.log(Math.abs(n)) / Math.log(REDUCE_BY)
 
-LaguerreMA = (n) ->
+LaguerreMA = (n, i) ->
+	if i is 0 then LINIT = [0,0,0,0]
 	L0 = (1 - LGAMMA) * n + LGAMMA * LINIT[0]
 	L1 = -LGAMMA * L0 + LINIT[0] + LGAMMA * LINIT[1]
 	L2 = -LGAMMA * L1 + LINIT[1] + LGAMMA * LINIT[2]
@@ -112,7 +118,8 @@ LaguerreMA = (n) ->
 	LINIT = [L0, L1, L2, L3]
 	return (L0 + 2*L1 + 2*L2 + L3) / 6
 
-LaguerreRSI = (n) ->
+LaguerreRSI = (n, i) ->
+	if i is 0 then LINIT = [0,0,0,0]
 	L0 = (1 - LGAMMA) * n + LGAMMA * LINIT[0]
 	L1 = -LGAMMA * L0 + LINIT[0] + LGAMMA * LINIT[1]
 	L2 = -LGAMMA * L1 + LINIT[1] + LGAMMA * LINIT[2]
@@ -138,25 +145,64 @@ LaguerreRSI = (n) ->
 		lrsi = cu / (cu + cd)
 	return lrsi
 
+FRAMA = (n, i, instrument) ->
+	switch DATA_INPUT
+		when 'Close'
+			price = n.close
+		when 'Typical'
+			price = (n.close + n.low + n.high) / 3
+		when 'Weighted'
+			price = (n.close*2 + n.low + n.high) / 4
+	if i < (FRAMA_LEN - 1)
+		FRAMA_PREV = price
+		return price
+	for x in [(i - FRAMA_LEN + 1)...i]
+		if not fh? or instrument[x].high > fh then fh = instrument[x].high
+		if not fl? or instrument[x].low < fl then fl = instrument[x].low
+	n3 = (fh - fl) / FRAMA_LEN
+	for x in [(i - FRAMA_LEN + 1)...(i - FRAMA_LEN / 2)]
+		if not lh? or instrument[x].high > lh then lh = instrument[x].high
+		if not ll? or instrument[x].low < ll then ll = instrument[x].low
+	n1 = (lh - ll) / (FRAMA_LEN / 2)
+	for x in [(i - (FRAMA_LEN / 2) + 1)...(i)]
+		if not hh? or instrument[x].high > hh then hh = instrument[x].high
+		if not hl? or instrument[x].low < hl then hl = instrument[x].low
+	n2 = (hh - hl) / (FRAMA_LEN / 2)
+	if n1 > 0 and n2 > 0 and n3 > 0 then dimen=(Math.log(n1 + n2) - Math.log(n3)) / Math.log(2)
+	w = Math.log(2/(FRAMA_SLOW + 1))
+	alpha = Math.exp(w * (dimen - 1))
+	if alpha < (2 / (FRAMA_SLOW + 1)) then alpha = 2 / (FRAMA_SLOW + 1)
+	if alpha > 1 then alpha = 1
+	filt = alpha * price + (1-alpha) * FRAMA_PREV
+	FRAMA_PREV = filt
+	return filt
+
 processMA = (selector, period, instrument, secondary = false) ->
 	if secondary
-		sInput = instrument
-	else if DATA_INPUT is 'Close'
-		sInput = instrument.close
-	else if DATA_INPUT is 'Typical'
-		sInput = talib.TYPPRICE
-			high: instrument.high
-			low: instrument.low
-			close: instrument.close
-			startIdx: 0
-			endIdx: instrument.close.length-1
-	else 
-		sInput = talib.WCLPRICE
-			high: instrument.high
-			low: instrument.low
-			close: instrument.close
-			startIdx: 0
-			endIdx: instrument.close.length-1
+		sInstrument = ['low', 'high', 'close']
+		sInstrument.low = instrument
+		sInstrument.high = instrument
+		sInstrument.close = instrument
+	else
+		sInstrument = instrument
+	
+	switch DATA_INPUT
+		when 'Close'
+			sInput = sInstrument.close
+		when 'Typical'
+			sInput = talib.TYPPRICE
+				high: sInstrument.high
+				low: sInstrument.low
+				close: sInstrument.close
+				startIdx: 0
+				endIdx: sInstrument.close.length-1
+		when 'Weighted'
+			sInput = talib.WCLPRICE
+				high: sInstrument.high
+				low: sInstrument.low
+				close: sInstrument.close
+				startIdx: 0
+				endIdx: sInstrument.close.length-1
 	
 	switch selector
 		when 'NONE'
@@ -278,9 +324,28 @@ processMA = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sInput.length-1
 		when 'Laguerre'
-			LINIT = [0,0,0,0]
-			LGAMMA = period
+			# Laguerre gamma (0.8)
+			if period < 1
+				LGAMMA = period
+			else
+				LGAMMA = 0.8
 			_.map(sInput, LaguerreMA)
+		when 'FRAMA'
+			# FRAMA length and slow period
+			limits = "#{period}".split " "
+			if limits[0]?
+				FRAMA_LEN = limits[0]
+				if FRAMA_LEN % 2 isnt 0 then FRAMA_LEN = FRAMA_LEN + 1
+			else
+				FRAMA_LEN = 16
+			if limits[1]?
+				FRAMA_SLOW = limits[1]
+			else
+				FRAMA_SLOW = 200
+			fInstrument = []
+			for x in [0...sInstrument.high.length-1]
+				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
+			_.map(fInstrument, FRAMA)
 
 processOSC = (selector, period, instrument) ->
 	switch OSC_TYPE
@@ -300,7 +365,6 @@ processOSC = (selector, period, instrument) ->
 				endIdx: instrument.close.length-1
 				optInTimePeriod: OSC_PERIOD
 		when 'LRSI'
-			LINIT = [0,0,0,0]
 			LGAMMA = OSC_PERIOD
 			price = processMA('NONE', 0, instrument)
 			lrsi = _.map(price, LaguerreRSI)
@@ -308,7 +372,6 @@ processOSC = (selector, period, instrument) ->
 			_.map(lrsi, feedbackDivide)
 		
 		when 'LMFI'
-			LINIT = [0,0,0,0]
 			LGAMMA = OSC_PERIOD
 			price = talib.MULT
 				inReal0: processMA('NONE', 0, instrument)
