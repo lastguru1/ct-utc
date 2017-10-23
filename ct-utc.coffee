@@ -73,7 +73,7 @@ LO_THRESHOLD = params.add 'Low threshold', -1.5
 
 # Which oscillator to use
 # Money Flow Index seems like the best one, but some may prefer Relative Strength Index
-OSC_TYPE = params.addOptions 'Oscillator type', ['MFI', 'RSI', 'LRSI', 'LMFI'], 'MFI'
+OSC_TYPE = params.addOptions 'Oscillator type', ['STOCH', 'RSI', 'MFI', 'LRSI', 'LMFI'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', 14
 
@@ -96,6 +96,7 @@ LGAMMA = 0
 FRAMA_LEN = 0
 FRAMA_SLOW = 0
 FRAMA_PREV = 0
+STOCH_LEN = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -145,6 +146,27 @@ LaguerreRSI = (n, i) ->
 		lrsi = 100 * cu / (cu + cd)
 	return lrsi
 
+Stochastic = (n, i, instrument) ->
+	switch DATA_INPUT
+		when 'Close'
+			price = n.close
+		when 'Typical'
+			price = (n.close + n.low + n.high) / 3
+		when 'Weighted'
+			price = (n.close*2 + n.low + n.high) / 4
+	if i < (STOCH_LEN - 1)
+		slen = i + 1
+	else
+		slen = STOCH_LEN
+	for x in [(i - slen + 1)..i]
+		if not fh? or instrument[x].high > fh then fh = instrument[x].high
+		if not fl? or instrument[x].low < fl then fl = instrument[x].low
+	if not fh? or not fl? or (fh - fl) is 0
+		sto = 0
+	else
+		sto = 100 * (price - fl) / (fh - fl)
+	return sto
+
 FRAMA = (n, i, instrument) ->
 	switch DATA_INPUT
 		when 'Close'
@@ -156,15 +178,15 @@ FRAMA = (n, i, instrument) ->
 	if i < (FRAMA_LEN - 1)
 		FRAMA_PREV = price
 		return price
-	for x in [(i - FRAMA_LEN + 1)...i]
+	for x in [(i - FRAMA_LEN + 1)..i]
 		if not fh? or instrument[x].high > fh then fh = instrument[x].high
 		if not fl? or instrument[x].low < fl then fl = instrument[x].low
 	n3 = (fh - fl) / FRAMA_LEN
-	for x in [(i - FRAMA_LEN + 1)...(i - FRAMA_LEN / 2)]
+	for x in [(i - FRAMA_LEN + 1)..(i - FRAMA_LEN / 2)]
 		if not lh? or instrument[x].high > lh then lh = instrument[x].high
 		if not ll? or instrument[x].low < ll then ll = instrument[x].low
 	n1 = (lh - ll) / (FRAMA_LEN / 2)
-	for x in [(i - (FRAMA_LEN / 2) + 1)...(i)]
+	for x in [(i - (FRAMA_LEN / 2) + 1)..(i)]
 		if not hh? or instrument[x].high > hh then hh = instrument[x].high
 		if not hl? or instrument[x].low < hl then hl = instrument[x].low
 	n2 = (hh - hl) / (FRAMA_LEN / 2)
@@ -343,12 +365,19 @@ processMA = (selector, period, instrument, secondary = false) ->
 			else
 				FRAMA_SLOW = 200
 			fInstrument = []
-			for x in [0...sInstrument.high.length-1]
+			for x in [0..sInstrument.high.length-1]
 				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, FRAMA)
 
 processOSC = (selector, period, instrument) ->
 	switch OSC_TYPE
+		when 'STOCH'
+			STOCH_LEN = period
+			fInstrument = []
+			for x in [0..instrument.high.length-1]
+				fInstrument[x] = {close: instrument.close[x], low: instrument.low[x], high: instrument.high[x]}
+			_.map(fInstrument, Stochastic)
+		
 		when 'MFI'
 			talib.MFI
 				high: instrument.high
@@ -357,26 +386,26 @@ processOSC = (selector, period, instrument) ->
 				volume: instrument.volumes
 				startIdx: 0
 				endIdx: instrument.close.length-1
-				optInTimePeriod: OSC_PERIOD
+				optInTimePeriod: period
 		when 'RSI'
 			talib.RSI
 				inReal: processMA('NONE', 0, instrument)
 				startIdx: 0
 				endIdx: instrument.close.length-1
-				optInTimePeriod: OSC_PERIOD
+				optInTimePeriod: period
 		when 'LRSI'
-			LGAMMA = OSC_PERIOD
+			LGAMMA = period
 			price = processMA('NONE', 0, instrument)
-			lrsi = _.map(price, LaguerreRSI)
+			_.map(price, LaguerreRSI)
 		
 		when 'LMFI'
-			LGAMMA = OSC_PERIOD
+			LGAMMA = period
 			price = talib.MULT
 				inReal0: processMA('NONE', 0, instrument)
 				inReal1: instrument.volumes
 				startIdx: 0
 				endIdx: instrument.volumes.length-1
-			lmfi = _.map(price, LaguerreRSI)
+			_.map(price, LaguerreRSI)
 
 init: ->
 	# All the plotlines
