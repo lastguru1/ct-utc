@@ -73,13 +73,16 @@ LO_THRESHOLD = params.add 'Low threshold', -1.5
 
 # Which oscillator to use
 # Money Flow Index seems like the best one, but some may prefer Relative Strength Index
-OSC_TYPE = params.addOptions 'Oscillator type', ['STOCH', 'RSI', 'MFI', 'LRSI', 'LMFI'], 'MFI'
+OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'LRSI', 'LMFI'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', 14
 
 # We may want to smooth the oscillator results a bit
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
 OSC_MA_P = params.add 'Oscillator MA period', '2'
+
+# Oscillator normalization: Stochastic of Inverse Fisher Transformation
+OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT'], 'NONE'
 
 # What trigger to use for oscillator
 # Early: trigger once crossed
@@ -166,6 +169,12 @@ Stochastic = (n, i, instrument) ->
 	else
 		sto = 100 * (price - fl) / (fh - fl)
 	return sto
+
+IFT = (n) ->
+	n = (n - 50) / 10
+	ift = (Math.exp(2*n) - 1) / (Math.exp(2*n) + 1)
+	ift = (ift + 1) * 50
+	return ift
 
 FRAMA = (n, i, instrument) ->
 	switch DATA_INPUT
@@ -369,42 +378,53 @@ processMA = (selector, period, instrument, secondary = false) ->
 				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, FRAMA)
 
-processOSC = (selector, period, instrument) ->
-	switch OSC_TYPE
-		when 'STOCH'
+processOSC = (selector, period, instrument, secondary = false) ->
+	if secondary
+		sInstrument = ['low', 'high', 'close']
+		sInstrument.low = instrument
+		sInstrument.high = instrument
+		sInstrument.close = instrument
+	else
+		sInstrument = instrument
+	
+	switch selector
+		when 'NONE'
+			instrument
+		when 'Stochastic'
 			STOCH_LEN = period
 			fInstrument = []
-			for x in [0..instrument.high.length-1]
-				fInstrument[x] = {close: instrument.close[x], low: instrument.low[x], high: instrument.high[x]}
+			for x in [0..sInstrument.high.length-1]
+				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, Stochastic)
-		
+		when 'IFT'
+			_.map(sInstrument.close, IFT)
 		when 'MFI'
 			talib.MFI
-				high: instrument.high
-				low: instrument.low
-				close: instrument.close
-				volume: instrument.volumes
+				high: sInstrument.high
+				low: sInstrument.low
+				close: sInstrument.close
+				volume: sInstrument.volumes
 				startIdx: 0
-				endIdx: instrument.close.length-1
+				endIdx: sInstrument.close.length-1
 				optInTimePeriod: period
 		when 'RSI'
 			talib.RSI
-				inReal: processMA('NONE', 0, instrument)
+				inReal: processMA('NONE', 0, sInstrument)
 				startIdx: 0
-				endIdx: instrument.close.length-1
+				endIdx: sInstrument.close.length-1
 				optInTimePeriod: period
 		when 'LRSI'
 			LGAMMA = period
-			price = processMA('NONE', 0, instrument)
+			price = processMA('NONE', 0, sInstrument)
 			_.map(price, LaguerreRSI)
 		
 		when 'LMFI'
 			LGAMMA = period
 			price = talib.MULT
-				inReal0: processMA('NONE', 0, instrument)
-				inReal1: instrument.volumes
+				inReal0: processMA('NONE', 0, sInstrument)
+				inReal1: sInstrument.volumes
 				startIdx: 0
-				endIdx: instrument.volumes.length-1
+				endIdx: sInstrument.volumes.length-1
 			_.map(price, LaguerreRSI)
 
 init: ->
@@ -601,6 +621,7 @@ handle: ->
 	if OSC_MODE isnt 'Crossing only'
 		osc = processOSC(OSC_TYPE, OSC_PERIOD, instrument)
 		osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
+		osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
 		plot
 			HighOsc: 100 - OSC_THRESHOLD
 			LowOsc: OSC_THRESHOLD
