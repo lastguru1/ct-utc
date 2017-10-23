@@ -33,7 +33,7 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # HMA - Hull Moving Average
 # HT - Hilbert Transform - Instantaneous Trendline
 # Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1))
-# FRAMA - Fractal Adaptive Moving Average (parameters: length, slow pariod)
+# FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 
 # Short MA
 SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
@@ -52,7 +52,7 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 # - decide, which sign (positive or negative) would each of the volume data points have
 #   (as volume does not have any sign at the beginning - it is always positive);
 #   NB: instead of volume data, OBV can be used - it is signed, so it is usable as is
-# - add the resulting data to the price data to be used bu LONG MA later
+# - add the resulting data to the price data to be used by LONG MA later
 # The feedback can be modified (reduced) before being added
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
@@ -130,7 +130,7 @@ LaguerreRSI = (n, i) ->
 	if L0 >= L1
 		cu = L0 - L1
 	else
-		cd = L1 = L0
+		cd = L1 - L0
 	if L1 >= L2
 		cu = cu + L1 - L2
 	else
@@ -142,7 +142,7 @@ LaguerreRSI = (n, i) ->
 	if cu + cd is 0
 		lrsi = 0
 	else
-		lrsi = cu / (cu + cd)
+		lrsi = 100 * cu / (cu + cd)
 	return lrsi
 
 FRAMA = (n, i, instrument) ->
@@ -368,8 +368,6 @@ processOSC = (selector, period, instrument) ->
 			LGAMMA = OSC_PERIOD
 			price = processMA('NONE', 0, instrument)
 			lrsi = _.map(price, LaguerreRSI)
-			REDUCE_BY = 0.01
-			_.map(lrsi, feedbackDivide)
 		
 		when 'LMFI'
 			LGAMMA = OSC_PERIOD
@@ -379,8 +377,6 @@ processOSC = (selector, period, instrument) ->
 				startIdx: 0
 				endIdx: instrument.volumes.length-1
 			lmfi = _.map(price, LaguerreRSI)
-			REDUCE_BY = 0.01
-			_.map(lmfi, feedbackDivide)
 
 init: ->
 	# All the plotlines
