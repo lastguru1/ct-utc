@@ -27,12 +27,12 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # TEMA - Triple Exponential Moving Average
 # TRIMA - Triangular Moving Average
 # KAMA - Kaufman Adaptive Moving Average
-# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1), slow limit (0..1))
-# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1), slow limit (0..1))
+# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, , Ehlers used 0.05))
+# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, , Ehlers used 0.05))
 # T3 - Triple Exponential Moving Average
 # HMA - Hull Moving Average
 # HT - Hilbert Transform - Instantaneous Trendline
-# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1))
+# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.7))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 
 # Short MA
@@ -71,11 +71,16 @@ MACD_MA_P = params.add 'MACD MA period', '10'
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
 
-# Which oscillator to use
-# Money Flow Index seems like the best one, but some may prefer Relative Strength Index
-OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'LRSI', 'LMFI'], 'MFI'
+# The following oscillators can be used:
+# Stochastic - Stochastic oscillator
+# RSI - Relative Strength Index
+# MFI - Money Flow Index (same as RSI, but including volume data, so more responsive to large trades)
+# LRSI - Laguerre Relative Strength Index (RSI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
+# LMFI - Laguerre Money Flow Index (MFI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
+# FT - Fisher Transform, compressed with Inverse Fisher Transformation (parameters: period, gamma (0..1, Ehlers used 0.33))
+OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'LRSI', 'LMFI', 'FT'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
-OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', 14
+OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # We may want to smooth the oscillator results a bit
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
@@ -100,6 +105,10 @@ FRAMA_LEN = 0
 FRAMA_SLOW = 0
 FRAMA_PREV = 0
 STOCH_LEN = 0
+FT_LEN = 0
+FT_GAMMA = 1
+FT_PREV = 0
+FT_V1 = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -175,6 +184,38 @@ IFT = (n) ->
 	ift = (Math.exp(2*n) - 1) / (Math.exp(2*n) + 1)
 	ift = (ift + 1) * 50
 	return ift
+
+FT = (n, i, instrument) ->
+	if i is 0
+		FT_PREV = 0
+		FT_V1 = 0
+	switch DATA_INPUT
+		when 'Close'
+			price = n.close
+		when 'Typical'
+			price = (n.close + n.low + n.high) / 3
+		when 'Weighted'
+			price = (n.close*2 + n.low + n.high) / 4
+	if i < (FT_LEN - 1)
+		flen = i + 1
+	else
+		flen = FT_LEN
+	for x in [(i - flen + 1)..i]
+		if not fh? or instrument[x].high > fh then fh = instrument[x].high
+		if not fl? or instrument[x].low < fl then fl = instrument[x].low
+	if not fh? or not fl? or (fh - fl) is 0
+		sto = 0
+	else
+		sto = (price - fl) / (fh - fl)
+	value1 = FT_GAMMA * 2 * (sto - 0.5) + (1 - FT_GAMMA) * FT_V1
+	if value1 > 0.99 then value1 = 0.999
+	if value1 < -0.99 then value1 = -0.999
+	FT_V1 = value1
+	fish = 0.5 * Math.log((1 + value1) / (1 - value1)) + 0.5 * FT_PREV
+	FT_PREV = fish
+	fish = (Math.exp(2*fish) - 1) / (Math.exp(2*fish) + 1)
+	fish = (fish + 1) * 50
+	return fish
 
 FRAMA = (n, i, instrument) ->
 	switch DATA_INPUT
@@ -355,7 +396,7 @@ processMA = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sInput.length-1
 		when 'Laguerre'
-			# Laguerre gamma (0.8)
+			# Laguerre gamma (0.7)
 			if period < 1
 				LGAMMA = period
 			else
@@ -396,6 +437,21 @@ processOSC = (selector, period, instrument, secondary = false) ->
 			for x in [0..sInstrument.high.length-1]
 				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, Stochastic)
+		when 'FT'
+			# Fisher Transform length and gamma
+			limits = "#{period}".split " "
+			if limits[0]?
+				FT_LEN = limits[0]
+			else
+				FT_LEN = 10
+			if limits[1]? and limits[1] < 1
+				FT_GAMMA = limits[1]
+			else
+				FT_GAMMA = 0.33
+			fInstrument = []
+			for x in [0..sInstrument.high.length-1]
+				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
+			_.map(fInstrument, FT)
 		when 'IFT'
 			_.map(sInstrument.close, IFT)
 		when 'MFI'
