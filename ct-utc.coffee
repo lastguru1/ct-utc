@@ -27,20 +27,21 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # TEMA - Triple Exponential Moving Average
 # TRIMA - Triangular Moving Average
 # KAMA - Kaufman Adaptive Moving Average
-# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, , Ehlers used 0.05))
-# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, , Ehlers used 0.05))
-# T3 - Triple Exponential Moving Average
+# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
+# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
+# T3 - Triple Exponential Moving Average (parameters: period, vFactor (0..1, default 0.7)
 # HMA - Hull Moving Average
+# ZLEMA - Zero-lag EMA
 # HT - Hilbert Transform - Instantaneous Trendline
-# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.7))
+# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 
 # Short MA
-SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
 SHORT_MA_P = params.add 'Short MA period or parameters', '10'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '10'
 
 # Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
@@ -56,7 +57,7 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 # The feedback can be modified (reduced) before being added
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
-FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
 FEED_MA_P = params.add 'Delta feedback MA period', '10'
 FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
@@ -64,7 +65,7 @@ FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'NONE'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period', '10'
 
 # High and low thresholds
@@ -83,7 +84,7 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
 OSC_MA_P = params.add 'Oscillator MA period', '2'
 
 # Oscillator normalization: Stochastic of Inverse Fisher Transformation
@@ -358,12 +359,22 @@ processMA = (selector, period, instrument, secondary = false) ->
 				optInSlowLimit: MAMA_SLOW
 			mama.outFAMA
 		when 'T3'
+			# Triple Exponential Moving Average period and vFactor
+			limits = "#{period}".split " "
+			if limits[0]?
+				T3_LEN = limits[0]
+			else
+				T3_LEN = 16
+			if limits[1]? and limits[1] < 1
+				T3_V = limits[1]
+			else
+				T3_V = 0.7
 			talib.T3
 				inReal: sInput
 				startIdx: 0
 				endIdx: sInput.length-1
-				optInTimePeriod: period
-				optInVFactor: 0.7
+				optInTimePeriod: T3_LEN
+				optInVFactor: T3_V
 		when 'HMA'
 			halfWMA = talib.WMA
 				inReal: sInput
@@ -396,7 +407,7 @@ processMA = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sInput.length-1
 		when 'Laguerre'
-			# Laguerre gamma (0.7)
+			# Laguerre gamma (0.8)
 			if period < 1
 				LGAMMA = period
 			else
@@ -418,6 +429,31 @@ processMA = (selector, period, instrument, secondary = false) ->
 			for x in [0..sInstrument.high.length-1]
 				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, FRAMA)
+		when 'ZLEMA'
+			ema1 = talib.EMA
+				inReal: sInput
+				startIdx: 0
+				endIdx: sInput.length-1
+				optInTimePeriod: period
+			ema2 = talib.EMA
+				inReal: ema1
+				startIdx: 0
+				endIdx: ema1.length-1
+				optInTimePeriod: period
+			if ema1.length > ema2.length
+				ema1 = _.drop(ema1, ema1.length - ema2.length)
+			if ema2.length > ema1.length
+				ema2 = _.drop(ema2, ema2.length - ema1.length)
+			emad = talib.SUB
+				inReal0: ema1
+				inReal1: ema2
+				startIdx: 0
+				endIdx: ema1.length-1
+			talib.ADD
+				inReal0: ema1
+				inReal1: emad
+				startIdx: 0
+				endIdx: ema1.length-1
 
 processOSC = (selector, period, instrument, secondary = false) ->
 	if secondary
