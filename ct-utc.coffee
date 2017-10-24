@@ -37,11 +37,11 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 
 # Short MA
-SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
 SHORT_MA_P = params.add 'Short MA period or parameters', '10'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '10'
 
 # Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
@@ -57,20 +57,24 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 # The feedback can be modified (reduced) before being added
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
-FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'SMA'
-FEED_MA_P = params.add 'Delta feedback MA period', '10'
+FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
+FEED_MA_P = params.add 'Delta feedback MA period or parameters', '10'
 FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
 FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA', 'Feedback MA', 'ShortFeedbackDelta', 'OBV'], 'Price'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'NONE'
-MACD_MA_P = params.add 'MACD MA period', '10'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'NONE'
+MACD_MA_P = params.add 'MACD MA period or parameters', '10'
 
 # High and low thresholds
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
+
+# We may want to smooth the data before making an oscillator
+OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'NONE'
+OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 
 # The following oscillators can be used:
 # Stochastic - Stochastic oscillator
@@ -84,8 +88,8 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA'], 'WMA'
-OSC_MA_P = params.add 'Oscillator MA period', '2'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'NONE'
+OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
 # Oscillator normalization: Stochastic of Inverse Fisher Transformation
 OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT'], 'NONE'
@@ -116,6 +120,9 @@ feedbackSign = (n) ->
 
 feedbackDivide = (n) ->
 	return n/REDUCE_BY
+
+feedbackMultiply = (n) ->
+	return n*REDUCE_BY
 
 feedbackRoot = (n) ->
 	return Math.sign(n) * Math.pow(Math.abs(n), REDUCE_BY)
@@ -454,6 +461,33 @@ processMA = (selector, period, instrument, secondary = false) ->
 				inReal1: emad
 				startIdx: 0
 				endIdx: ema1.length-1
+		when 'WRainbow'
+			wma = sInput
+			i = 0
+			for x in [0..period-1]
+				wma = talib.WMA
+					inReal: wma
+					startIdx: 0
+					endIdx: wma.length-1
+					optInTimePeriod: 2
+				if x < period/2
+					REDUCE_BY = period/2 - x
+					i = i + period/2 - x
+					mwma = _.map(wma, feedbackMultiply)
+				else
+					i = i + 1
+					mwma = wma
+				if wr?
+					wr = _.drop(wr, wr.length - mwma.length)
+					wr = talib.ADD
+						inReal0: wr
+						inReal1: mwma
+						startIdx: 0
+						endIdx: wr.length-1
+				else
+					wr = mwma
+			REDUCE_BY = i
+			_.map(wr, feedbackDivide)
 
 processOSC = (selector, period, instrument, secondary = false) ->
 	if secondary
@@ -711,7 +745,17 @@ handle: ->
 				MACD: _.last(macdDelta)
 	
 	if OSC_MODE isnt 'Crossing only'
-		osc = processOSC(OSC_TYPE, OSC_PERIOD, instrument)
+		if OSC_MAP_T isnt 'NONE'
+			osc = processMA(OSC_MAP_T, OSC_MAP_P, instrument)
+			sInstrument = ['low', 'high', 'close', 'volumes']
+			sInstrument.low = osc
+			sInstrument.high = osc
+			sInstrument.close = osc
+			sInstrument.volumes = instrument.volumes
+			sInstrument.volumes = _.drop(sInstrument.volumes, sInstrument.volumes.length - osc.length)
+		else
+			sInstrument = instrument
+		osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
 		osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 		osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
 		plot
