@@ -257,6 +257,10 @@ FRAMA = (n, i, instrument) ->
 	FRAMA_PREV = filt
 	return filt
 
+sigRound = (n, sig) ->
+	mult = Math.pow(10, sig - Math.floor(Math.log(n) / Math.LN10) - 1)
+	Math.round(n * mult) / mult
+
 processMA = (selector, period, instrument, secondary = false) ->
 	if secondary
 		sInstrument = ['low', 'high', 'close']
@@ -590,20 +594,51 @@ init: ->
 			color: 'lightpink'
 			secondary: true
 		HighOsc:
-			color: 'darkyellow'
-			secondary: true
+			color: 'orange'
 		LowOsc:
-			color: 'darkyellow'
-			secondary: true
+			color: 'orange'
 		Oscillator:
-			color: 'darkyellow'
-			secondary: true
+			color: 'orange'
+	
+	info "Welcome to Cryptotrader Universal Trading Constructor bot by lastguru"
+	info "Newest code is available here: https://github.com/lastguru1/ct-utc"
 
 handle: ->
 	instrument = @data.instruments[0]
+	close = instrument.close[instrument.close.length-1]
+	# Starting state
 	storage.botStartedAt ?= data.at
+	storage.lastBuyPrice ?= 0
+	storage.lastSellPrice ?= 0
+	storage.wonTrades ?= 0
+	storage.lostTrades ?= 0
+	storage.startBase ?= @portfolios[instrument.market].positions[instrument.base()].amount
+	storage.startAsset ?= @portfolios[instrument.market].positions[instrument.asset()].amount
+	storage.startPrice ?= close
+	# Current state
+	baseName = instrument.base().toUpperCase()
+	assetName = instrument.asset().toUpperCase()
+	curBase = @portfolios[instrument.market].positions[instrument.base()].amount
+	curAsset = @portfolios[instrument.market].positions[instrument.asset()].amount
+	startBaseEquiv = storage.startBase + storage.startAsset * storage.startPrice
+	startAssetEquiv = storage.startAsset + storage.startBase / storage.startPrice
+	curBaseEquiv = curBase + curAsset * close
+	curAssetEquiv = curAsset + curBase / close
+	gainBH = 100 * (close / storage.startPrice - 1)
+	gainBot = 100 * (startBaseEquiv / curBaseEquiv - 1)
+	
+	# Printing state
+	info "========== Lastguru's UTC bot =========="
+	debug "Starting " + baseName + ": " + _.round(storage.startBase, 2) + " | Starting " + assetName + ": " + _.round(storage.startAsset, 2) + " | Starting " + baseName + " equivalent: " + _.round(startBaseEquiv, 2)
+	debug "Current " + baseName + ": " + _.round(curBase, 2) + " | Current " + assetName + ": " + _.round(curAsset, 2) + " | Current " + baseName + " equivalent: " + _.round(curBaseEquiv, 2)
+	debug "Starting price: " + sigRound(storage.startPrice, 5) + " | Current price: " + sigRound(close, 5)
+	debug "Trades: " + (storage.wonTrades + storage.lostTrades) + " | Won: " + storage.wonTrades + " | Lost: " + storage.lostTrades + " | W/L: " + _.round(100 * storage.winTrades / (storage.wonTrades + storage.lostTrades), 2) + "%"
+	debug "Buy and Hold efficiency: " + _.round(gainBH, 2) + "% | Bot efficiency: " + _.round(gainBot, 2) + "%"
+  
+	# Set oscillator scale and position
+	storage.oscHigh ?= close * 0.95
+	storage.oscLow ?= close * 0.9
 	#	storage.sldHi ?= 0
-	debug "price: #{instrument.close[instrument.close.length-1]} #{instrument.base().toUpperCase()} at #{new Date(data.at)}"
 	
 	plot
 		Zero: 0
@@ -759,9 +794,9 @@ handle: ->
 		osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 		osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
 		plot
-			HighOsc: 100 - OSC_THRESHOLD
-			LowOsc: OSC_THRESHOLD
-			Oscillator: _.last(osc)
+			HighOsc: storage.oscHigh - OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
+			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
+			Oscillator: storage.oscLow + _.last(osc) * (storage.oscHigh - storage.oscLow) / 100
 
 	#	if _.last(shortLongDelta) > HI_THRESHOLD
 	#		storage.sldHi = 1
