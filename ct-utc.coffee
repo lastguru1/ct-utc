@@ -674,6 +674,7 @@ makeDelta = (instrument) ->
 		endIdx: long.length-1
 	delta['long'] = _.last(long)
 	delta['shortLongDelta'] = _.last(shortLongDelta)
+	deltaResult = _.last(shortLongDelta)
 	
 	if MACD_MA_T isnt 'NONE'
 		macd = processMA(MACD_MA_T, MACD_MA_P, shortLongDelta, true)
@@ -686,7 +687,17 @@ makeDelta = (instrument) ->
 			inReal1: macd
 			startIdx: 0
 			endIdx: macd.length-1
+		delta['macdSignal'] = _.last(macd)
 		delta['macdDelta'] = _.last(macdDelta)
+		deltaResult = _.last(macdDelta)
+	
+	if storage.lastDelta < HI_THRESHOLD and deltaResult >= HI_THRESHOLD
+		storage.scoreDelta = 1
+	else if storage.lastDelta > LO_THRESHOLD and deltaResult <= LO_THRESHOLD
+		storage.scoreDelta = -1
+	else
+		storage.scoreDelta = 0
+	storage.lastDelta = deltaResult
 	return delta
 
 makeOsc = (instrument) ->
@@ -703,6 +714,46 @@ makeOsc = (instrument) ->
 	osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
 	osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 	osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
+	oscResult = _.last(osc)
+	
+	switch OSC_TRIGGER
+		when 'Early'
+			if storage.lastOsc > OSC_THRESHOLD and oscResult <= OSC_THRESHOLD
+				storage.scoreOsc = 1
+			else if storage.lastOsc < (100 - OSC_THRESHOLD) and oscResult >= (100 - OSC_THRESHOLD)
+				storage.scoreOsc = -1
+			else
+				storage.scoreOsc = 0
+		when 'Extreme'
+			if storage.lastOsc <= oscResult and oscResult <= OSC_THRESHOLD
+				storage.scoreOsc = 1
+			else if storage.lastOsc >= oscResult and oscResult >= (100 - OSC_THRESHOLD)
+				storage.scoreOsc = -1
+			else
+				storage.scoreOsc = 0
+		when 'Late'
+			if storage.lastOsc < OSC_THRESHOLD and oscResult >= OSC_THRESHOLD
+				storage.scoreOsc = 1
+			else if storage.lastOsc > (100 - OSC_THRESHOLD) and oscResult <= (100 - OSC_THRESHOLD)
+				storage.scoreOsc = -1
+			else
+				storage.scoreOsc = 0
+		when 'Buy early, sell late'
+			if storage.lastOsc > OSC_THRESHOLD and oscResult <= OSC_THRESHOLD
+				storage.scoreOsc = 1
+			else if storage.lastOsc > (100 - OSC_THRESHOLD) and oscResult <= (100 - OSC_THRESHOLD)
+				storage.scoreOsc = -1
+			else
+				storage.scoreOsc = 0
+		when 'Buy late, sell early'
+			if storage.lastOsc < OSC_THRESHOLD and oscResult >= OSC_THRESHOLD
+				storage.scoreOsc = 1
+			else if storage.lastOsc < (100 - OSC_THRESHOLD) and oscResult >= (100 - OSC_THRESHOLD)
+				storage.scoreOsc = -1
+			else
+				storage.scoreOsc = 0	
+	
+	storage.lastOsc = oscResult
 	return _.last(osc)
 
 init: ->
@@ -729,8 +780,12 @@ init: ->
 			color: 'darkgreen'
 			secondary: true
 		# MACD MA on Short-Long delta
-		MACD:
+		MACDSignal:
 			color: 'magenta'
+			secondary: true
+		# MACD MA and Short-Long delta delta
+		MACD:
+			color: 'pink'
 			secondary: true
 		Zero:
 			color: 'darkgrey'
@@ -747,6 +802,12 @@ init: ->
 			color: 'orange'
 		Oscillator:
 			color: 'orange'
+		Buy:
+			color: 'green'
+			size: 8
+		Sell:
+			color: 'red'
+			size: 8
 	
 	info "Welcome to Cryptotrader Universal Trading Constructor bot by lastguru"
 	info "Newest code is available here: https://github.com/lastguru1/ct-utc"
@@ -760,6 +821,7 @@ handle: ->
 	storage.lastSellPrice ?= 0
 	storage.lastDelta ?= 0
 	storage.lastOsc ?= 0
+	storage.lastAction ?= 0
 	storage.scoreDelta ?= 0
 	storage.scoreOsc ?= 0
 	storage.wonTrades ?= 0
@@ -787,9 +849,8 @@ handle: ->
 	debug "Trades: " + (storage.wonTrades + storage.lostTrades) + " | Won: " + storage.wonTrades + " | Lost: " + storage.lostTrades + " | W/L: " + _.round(100 * storage.winTrades / (storage.wonTrades + storage.lostTrades), 2) + "%"
 	debug "Buy and Hold efficiency: " + _.round(gainBH, 2) + "% | Bot efficiency: " + _.round(gainBot, 2) + "%"
 	# Set oscillator scale and position
-	storage.oscHigh ?= close * 0.95
-	storage.oscLow ?= close * 0.9
-	#	storage.sldHi ?= 0
+	storage.oscHigh ?= close * 0.75
+	storage.oscLow ?= close * 0.65
 	
 	plot
 		Zero: 0
@@ -809,6 +870,7 @@ handle: ->
 				CorrectedPrice: delta.correctedPrice
 		if MACD_MA_T isnt 'NONE'
 			plot
+				MACDSignal: delta.macdSignal
 				MACD: delta.macdDelta
 	
 	if OSC_MODE isnt 'Crossing only'
@@ -817,3 +879,12 @@ handle: ->
 			HighOsc: storage.oscHigh - OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			Oscillator: storage.oscLow + osc * (storage.oscHigh - storage.oscLow) / 100
+	score = storage.scoreDelta + storage.scoreOsc
+	if score is 1 and storage.lastAction isnt 1
+		storage.lastAction = 1
+		plotMark
+			"Buy": close
+	if score is -1 and storage.lastAction isnt -1
+		storage.lastAction = -1
+		plotMark
+			"Sell": close
