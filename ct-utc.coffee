@@ -3,6 +3,9 @@
 # All rights reserved.
 # 
 # This software uses BSD 2-clause "Simplified" License: https://github.com/lastguru1/ct-utc/blob/master/LICENSE
+# Although attribution is not required by the license, if you use this code in your software, please be nice.
+# 
+# Donations are always welcome. BTC: 1Gnv7zAm5pyhydheUzEuVRRT4BpCJASFsg, ETH: 0xB643711A58b0b84Ed317BA3E6Cf9BEFf91E27587
 # 
 # Newest version of the software is available here: https://github.com/lastguru1/ct-utc
 
@@ -35,6 +38,7 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # HT - Hilbert Transform - Instantaneous Trendline
 # Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
+# WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA, but with WMA as its base)
 
 # Short MA
 SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
