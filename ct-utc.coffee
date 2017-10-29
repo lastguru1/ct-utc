@@ -16,9 +16,6 @@ params = require 'params'
 # Strategy definition. If entered, all other options are ignored. Used for fast parameter reuse and sharing.
 # STRATEGY = params.add 'Strategy definition', ''
 
-# We can use crossings and/or oscillator to detect opportunities
-OSC_MODE = params.addOptions 'Mode', ['Crossing only', 'Oscillator only', 'Any'], 'Any'
-
 # What data input to use for MAs that only take one input: Close Price or Weighted Close Price
 DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], 'Close'
 
@@ -40,32 +37,33 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 # WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA, but with WMA as its base)
 
-# Short MA
-SHORT_MA_T = params.addOptions 'Short MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
+# Short MA. If you choose NONE, trading on crossings will be disabled
+SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
 SHORT_MA_P = params.add 'Short MA period or parameters', '10'
 
 # Long MA
 LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '10'
 
-# Feedback can be applied on the price data used by LONG MA calculations (note: only LONG MA uses feedback)
+# Feedback can be applied on the price data used by MA calculations
 # Delta feedback works like that:
 # - calculate Feedback line using the given MA
 # - calculate Short-Feedback delta
-# - add the resulting delta to the price data to be used by LONG MA later
+# - add the resulting delta to the price data to be used by Short and/or Long MA later
 # Volume feedback works like that:
 # - decide, which sign (positive or negative) would each of the volume data points have
 #   (as volume does not have any sign at the beginning - it is always positive);
 #   NB: instead of volume data, OBV can be used - it is signed, so it is usable as is
-# - add the resulting data to the price data to be used by LONG MA later
+# - add the resulting data to the price data to be used by Short and/or Long MA later
 # The feedback can be modified (reduced) before being added
+FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA', 'Long MA', 'Both'], 'Long MA'
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
 FEED_MA_P = params.add 'Delta feedback MA period or parameters', '10'
 FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
-FEED_VOLUME_S = params.addOptions 'Volume accounting type', ['Price', 'Short MA', 'Feedback MA', 'ShortFeedbackDelta', 'OBV'], 'Price'
+FEED_VOLUME_S = params.addOptions 'Read volume sign from', ['Price change', 'Short MA change', 'Feedback MA change', 'ShortFeedbackDelta change', 'ShortFeedbackDelta sign'], 'Price change'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
@@ -75,6 +73,9 @@ MACD_MA_P = params.add 'MACD MA period or parameters', '10'
 # High and low thresholds
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
+
+# We can use crossings and/or oscillator to detect opportunities
+OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds'], 'Regular'
 
 # We may want to smooth the data before making an oscillator
 OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'NONE'
@@ -129,7 +130,7 @@ feedbackMultiply = (n) ->
 	return n*REDUCE_BY
 
 feedbackRoot = (n) ->
-	return Math.sign(n) * Math.pow(Math.abs(n), REDUCE_BY)
+	return Math.sign(n) * Math.pow(Math.abs(n), 1/REDUCE_BY)
 
 feedbackLog = (n) ->
 	return Math.sign(n) * Math.log(Math.abs(n)) / Math.log(REDUCE_BY)
@@ -248,7 +249,7 @@ FRAMA = (n, i, instrument) ->
 		if not lh? or instrument[x].high > lh then lh = instrument[x].high
 		if not ll? or instrument[x].low < ll then ll = instrument[x].low
 	n1 = (lh - ll) / (FRAMA_LEN / 2)
-	for x in [(i - (FRAMA_LEN / 2) + 1)..(i)]
+	for x in [(i - FRAMA_LEN / 2 + 1)..i]
 		if not hh? or instrument[x].high > hh then hh = instrument[x].high
 		if not hl? or instrument[x].low < hl then hl = instrument[x].low
 	n2 = (hh - hl) / (FRAMA_LEN / 2)
@@ -432,12 +433,12 @@ processMA = (selector, period, instrument, secondary = false) ->
 			# FRAMA length and slow period
 			limits = "#{period}".split " "
 			if limits[0]?
-				FRAMA_LEN = limits[0]
+				FRAMA_LEN = 1*limits[0]
 				if FRAMA_LEN % 2 isnt 0 then FRAMA_LEN = FRAMA_LEN + 1
 			else
 				FRAMA_LEN = 16
 			if limits[1]?
-				FRAMA_SLOW = limits[1]
+				FRAMA_SLOW = 1*limits[1]
 			else
 				FRAMA_SLOW = 200
 			fInstrument = []
@@ -564,7 +565,6 @@ processOSC = (selector, period, instrument, secondary = false) ->
 makeDelta = (instrument) ->
 	delta = []
 	short = processMA(SHORT_MA_T, SHORT_MA_P, instrument)
-	delta['short'] = _.last(short)
 	lInput = processMA('NONE', 0, instrument)
 	if FEED_DELTA_T isnt 'NONE'
 		feedback = processMA(FEED_MA_T, FEED_MA_P, instrument)
@@ -598,49 +598,40 @@ makeDelta = (instrument) ->
 			endIdx: feedDelta.length-1
 	
 	if FEED_VOLUME_T isnt 'NONE'
-		if FEED_VOLUME_S isnt 'OBV'
-			switch FEED_VOLUME_S
-				when 'Price'
-					priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
-					priceNew = _.drop(processMA('NONE', 0, instrument), 1)
-				when 'Short MA'
-					priceOld = _.dropRight(short, 1)
-					priceNew = _.drop(short, 1)
-				when 'Feedback MA'
-					priceOld = _.dropRight(feedback, 1)
-					priceNew = _.drop(feedback, 1)
-				when 'ShortFeedbackDelta'
-					priceOld = _.dropRight(shortFeedbackDelta, 1)
-					priceNew = _.drop(shortFeedbackDelta, 1)
-					
-			priceDiff = talib.SUB
-				inReal0: priceNew
-				inReal1: priceOld
-				startIdx: 0
-				endIdx: priceOld.length-1
-			signs = _.map(priceDiff, feedbackSign)
-			volume = instrument.volumes
-			if signs.length > volume.length
-				signs = _.drop(signs, signs.length - volume.length)
-			if volume.length > signs.length
-				volume = _.drop(volume, volume.length - signs.length)
-			volume = talib.MULT
-				inReal0: signs
-				inReal1: volume
-				startIdx: 0
-				endIdx: signs.length-1
-		else
-			price = processMA('NONE', 0, instrument)
-			volume = instrument.volumes
-			if price.length > volume.length
-				price = _.drop(price, price.length - volume.length)
-			if volume.length > price.length
-				volume = _.drop(volume, volume.length - price.length)
-			volume = talib.OBV
-				inReal: price
-				volume: volume
-				startIdx: 0
-				endIdx: signs.length-1
+		switch FEED_VOLUME_S
+			when 'Price change'
+				priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
+				priceNew = _.drop(processMA('NONE', 0, instrument), 1)
+			when 'Short MA change'
+				priceOld = _.dropRight(short, 1)
+				priceNew = _.drop(short, 1)
+			when 'Feedback MA change'
+				priceOld = _.dropRight(feedback, 1)
+				priceNew = _.drop(feedback, 1)
+			when 'ShortFeedbackDelta change'
+				priceOld = _.dropRight(shortFeedbackDelta, 1)
+				priceNew = _.drop(shortFeedbackDelta, 1)
+			when 'ShortFeedbackDelta sign'
+				priceNew = []
+				priceNew[x] = 0 for x in [0..shortFeedbackDelta.length-1]
+				priceOld = shortFeedbackDelta
+		
+		priceDiff = talib.SUB
+			inReal0: priceNew
+			inReal1: priceOld
+			startIdx: 0
+			endIdx: priceOld.length-1
+		signs = _.map(priceDiff, feedbackSign)
+		volume = instrument.volumes
+		if signs.length > volume.length
+			signs = _.drop(signs, signs.length - volume.length)
+		if volume.length > signs.length
+			volume = _.drop(volume, volume.length - signs.length)
+		volume = talib.MULT
+			inReal0: signs
+			inReal1: volume
+			startIdx: 0
+			endIdx: signs.length-1
 		
 		REDUCE_BY = FEED_VOLUME_P
 		switch FEED_VOLUME_T
@@ -666,7 +657,16 @@ makeDelta = (instrument) ->
 		delta['shortFeedbackDelta'] = _.last(shortFeedbackDelta)
 		delta['correctedPrice'] = _.last(lInput)
 	
-	long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+	switch FEED_APPLY
+		when 'Short MA'
+			short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
+			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+		when 'Long MA'
+			long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+		when 'Both'
+			short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
+			long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+	
 	if long.length > short.length
 		long = _.drop(long, long.length - short.length)
 	if short.length > long.length
@@ -676,6 +676,7 @@ makeDelta = (instrument) ->
 		inReal1: long
 		startIdx: 0
 		endIdx: long.length-1
+	delta['short'] = _.last(short)
 	delta['long'] = _.last(long)
 	delta['shortLongDelta'] = _.last(shortLongDelta)
 	deltaResult = _.last(shortLongDelta)
@@ -757,6 +758,9 @@ makeOsc = (instrument) ->
 			else
 				storage.scoreOsc = 0	
 	
+	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.lastDelta > LO_THRESHOLD and storage.lastDelta < HI_THRESHOLD
+		storage.scoreOsc = 0
+	
 	storage.lastOsc = oscResult
 	return _.last(osc)
 
@@ -806,12 +810,9 @@ init: ->
 			color: 'orange'
 		Oscillator:
 			color: 'orange'
-		Buy:
-			color: 'green'
-			size: 8
-		Sell:
+		Score:
 			color: 'red'
-			size: 8
+			secondary: true
 	
 	info "Welcome to Cryptotrader Universal Trading Constructor bot by lastguru"
 	info "Newest code is available here: https://github.com/lastguru1/ct-utc"
@@ -843,7 +844,7 @@ handle: ->
 	curBaseEquiv = curBase + curAsset * close
 	curAssetEquiv = curAsset + curBase / close
 	gainBH = 100 * (close / storage.startPrice - 1)
-	gainBot = 100 * (startBaseEquiv / curBaseEquiv - 1)
+	gainBot = 100 * (curBaseEquiv / startBaseEquiv - 1)
 	
 	# Printing state
 	info "========== Lastguru's UTC bot =========="
@@ -859,7 +860,7 @@ handle: ->
 	plot
 		Zero: 0
 	
-	if OSC_MODE isnt 'Oscillator only'
+	if SHORT_MA_T isnt 'NONE'
 		delta = makeDelta(instrument)
 		plot
 			HighThreshold: HI_THRESHOLD
@@ -877,18 +878,18 @@ handle: ->
 				MACDSignal: delta.macdSignal
 				MACD: delta.macdDelta
 	
-	if OSC_MODE isnt 'Crossing only'
+	if OSC_MODE isnt 'NONE'
 		osc = makeOsc(instrument)
 		plot
 			HighOsc: storage.oscHigh - OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			Oscillator: storage.oscLow + osc * (storage.oscHigh - storage.oscLow) / 100
 	score = storage.scoreDelta + storage.scoreOsc
+	plot
+		Score: score
 	if score is 1 and storage.lastAction isnt 1
 		storage.lastAction = 1
-		plotMark
-			"Buy": close
+		trading.buy instrument
 	if score is -1 and storage.lastAction isnt -1
 		storage.lastAction = -1
-		plotMark
-			"Sell": close
+		trading.sell instrument
