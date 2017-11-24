@@ -56,7 +56,7 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 #   NB: instead of volume data, OBV can be used - it is signed, so it is usable as is
 # - add the resulting data to the price data to be used by Short and/or Long MA later
 # The feedback can be modified (reduced) before being added
-FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA', 'Long MA', 'Both'], 'Long MA'
+FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA price', 'Long MA price', 'Both prices', 'Short MA', 'Long MA', 'Both'], 'Long MA'
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'SMA'
@@ -70,11 +70,11 @@ FEED_VOLUME_S = params.addOptions 'Read volume sign from', ['Price change', 'Sho
 MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period or parameters', '10'
 
-# High and low thresholds
+# High and low thresholds in percentage of the closing price
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
 
-# We can use crossings and/or oscillator to detect opportunities
+# We can use crossings and/or oscillator to detect opportunities. "Thresholds" disables trading if MA delta is within the thresholds
 OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds'], 'Regular'
 
 # We may want to smooth the data before making an oscillator
@@ -119,6 +119,8 @@ FT_LEN = 0
 FT_GAMMA = 1
 FT_PREV = 0
 FT_V1 = 0
+CURR_HI_THRESHOLD = 0
+CURR_LO_THRESHOLD = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -696,9 +698,9 @@ makeDelta = (instrument) ->
 		delta['macdDelta'] = _.last(macdDelta)
 		deltaResult = _.last(macdDelta)
 	
-	if storage.lastDelta < HI_THRESHOLD and deltaResult >= HI_THRESHOLD
+	if storage.lastDelta < CURR_HI_THRESHOLD and deltaResult >= CURR_HI_THRESHOLD
 		storage.scoreDelta = 1
-	else if storage.lastDelta > LO_THRESHOLD and deltaResult <= LO_THRESHOLD
+	else if storage.lastDelta > CURR_LO_THRESHOLD and deltaResult <= CURR_LO_THRESHOLD
 		storage.scoreDelta = -1
 	else
 		storage.scoreDelta = 0
@@ -758,7 +760,7 @@ makeOsc = (instrument) ->
 			else
 				storage.scoreOsc = 0	
 	
-	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.lastDelta > LO_THRESHOLD and storage.lastDelta < HI_THRESHOLD
+	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.lastDelta > CURR_LO_THRESHOLD and storage.lastDelta < CURR_HI_THRESHOLD
 		storage.scoreOsc = 0
 	
 	storage.lastOsc = oscResult
@@ -820,6 +822,9 @@ init: ->
 handle: ->
 	instrument = @data.instruments[0]
 	close = instrument.close[instrument.close.length-1]
+	CURR_HI_THRESHOLD = close * HI_THRESHOLD / 100
+	CURR_LO_THRESHOLD = close * LO_THRESHOLD / 100
+
 	# Starting state
 	storage.botStartedAt ?= data.at
 	storage.lastBuyPrice ?= 0
@@ -863,8 +868,8 @@ handle: ->
 	if SHORT_MA_T isnt 'NONE'
 		delta = makeDelta(instrument)
 		plot
-			HighThreshold: HI_THRESHOLD
-			LowThreshold: LO_THRESHOLD
+			HighThreshold: CURR_HI_THRESHOLD
+			LowThreshold: CURR_LO_THRESHOLD
 			Short: delta.short
 			Long: delta.long
 			ShortLongDelta: delta.shortLongDelta
