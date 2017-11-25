@@ -51,21 +51,13 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 # Delta feedback works like that:
 # - calculate Feedback line using the given MA
 # - calculate Short-Feedback delta
-# - add the resulting delta to the price data to be used by Short and/or Long MA later
-# Volume feedback works like that:
-# - decide, which sign (positive or negative) would each of the volume data points have
-#   (as volume does not have any sign at the beginning - it is always positive);
-#   NB: instead of volume data, OBV can be used - it is signed, so it is usable as is
-# - add the resulting data to the price data to be used by Short and/or Long MA later
+# - add the resulting delta to the price data to be used by Short and/or Long MA later, or to the MA results
 # The feedback can be modified (reduced) before being added
 FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA price', 'Long MA price', 'Both prices', 'Short MA', 'Long MA', 'Both MA'], 'Long MA'
 FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'SMA'
 FEED_MA_P = params.add 'Delta feedback MA period or parameters', '10'
-FEED_VOLUME_T = params.addOptions 'Volume feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
-FEED_VOLUME_P = params.add 'Volume feedback reduction value', 1
-FEED_VOLUME_S = params.addOptions 'Read volume sign from', ['Price change', 'Short MA change', 'Feedback MA change', 'ShortFeedbackDelta change', 'ShortFeedbackDelta sign'], 'Price change'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
@@ -660,62 +652,7 @@ makeDelta = (instrument) ->
 			startIdx: 0
 			endIdx: feedDelta.length-1
 	
-	if FEED_VOLUME_T isnt 'NONE'
-		switch FEED_VOLUME_S
-			when 'Price change'
-				priceOld = _.dropRight(processMA('NONE', 0, instrument), 1)
-				priceNew = _.drop(processMA('NONE', 0, instrument), 1)
-			when 'Short MA change'
-				priceOld = _.dropRight(short, 1)
-				priceNew = _.drop(short, 1)
-			when 'Feedback MA change'
-				priceOld = _.dropRight(feedback, 1)
-				priceNew = _.drop(feedback, 1)
-			when 'ShortFeedbackDelta change'
-				priceOld = _.dropRight(shortFeedbackDelta, 1)
-				priceNew = _.drop(shortFeedbackDelta, 1)
-			when 'ShortFeedbackDelta sign'
-				priceNew = []
-				priceNew[x] = 0 for x in [0..shortFeedbackDelta.length-1]
-				priceOld = shortFeedbackDelta
-		
-		priceDiff = talib.SUB
-			inReal0: priceNew
-			inReal1: priceOld
-			startIdx: 0
-			endIdx: priceOld.length-1
-		signs = _.map(priceDiff, feedbackSign)
-		volume = instrument.volumes
-		if signs.length > volume.length
-			signs = _.drop(signs, signs.length - volume.length)
-		if volume.length > signs.length
-			volume = _.drop(volume, volume.length - signs.length)
-		volume = talib.MULT
-			inReal0: signs
-			inReal1: volume
-			startIdx: 0
-			endIdx: signs.length-1
-		
-		REDUCE_BY = FEED_VOLUME_P
-		switch FEED_VOLUME_T
-			when 'Division'
-				feedVolume = _.map(volume, feedbackDivide)
-			when 'Root'
-				feedVolume = _.map(volume, feedbackRoot)
-			when 'Logarithm'
-				feedVolume = _.map(volume, feedbackLog)
-		
-		if lInput.length > feedVolume.length
-			lInput = _.drop(lInput, lInput.length - feedVolume.length)
-		if short.length > lInput.length
-			feedVolume = _.drop(feedVolume, feedVolume.length - lInput.length)
-		lInput = talib.ADD
-			inReal0: lInput
-			inReal1: feedVolume
-			startIdx: 0
-			endIdx: feedVolume.length-1
-	
-	if FEED_VOLUME_T isnt 'NONE' or FEED_DELTA_T isnt 'NONE'
+	if FEED_DELTA_T isnt 'NONE'
 		delta['feedback'] = _.last(feedback)
 		delta['shortFeedbackDelta'] = _.last(shortFeedbackDelta)
 		delta['correctedPrice'] = _.last(lInput)
@@ -936,7 +873,7 @@ handle: ->
 			Short: delta.short
 			Long: delta.long
 			ShortLongDelta: delta.shortLongDelta
-		if FEED_VOLUME_T isnt 'NONE' or FEED_DELTA_T isnt 'NONE'
+		if FEED_DELTA_T isnt 'NONE'
 			plot
 				Feedback: delta.feedback
 				ShortFeedbackDelta: delta.shortFeedbackDelta
