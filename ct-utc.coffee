@@ -133,6 +133,13 @@ feedbackRoot = (n) ->
 feedbackLog = (n) ->
 	return Math.sign(n) * Math.log(Math.abs(n)) / Math.log(REDUCE_BY)
 
+fixLength = (first, second) ->
+	if first.length > second.length
+		first = _.drop(first, first.length - second.length)
+	if second.length > first.length
+		second = _.drop(second, second.length - first.length)
+	return [first, second]
+
 EVWMA = (n, i, instrument) ->
 	if i is 0
 		EV_PREV = 0
@@ -622,10 +629,7 @@ makeDelta = (instrument) ->
 	short = processMA(SHORT_MA_T, SHORT_MA_P, instrument)
 	if FEED_DELTA_T isnt 'NONE'
 		feedback = processMA(FEED_MA_T, FEED_MA_P, instrument)
-		if feedback.length > short.length
-			feedback = _.drop(feedback, feedback.length - short.length)
-		if short.length > feedback.length
-			short = _.drop(short, short.length - feedback.length)
+		[feedback, short] = fixLength(feedback, short)
 		shortFeedbackDelta = talib.SUB
 			inReal0: short
 			inReal1: feedback
@@ -644,10 +648,7 @@ makeDelta = (instrument) ->
 	switch FEED_APPLY
 		when 'Short MA price'
 			lInput = processMA('NONE', 0, instrument)
-			if lInput.length > feedDelta.length
-				lInput = _.drop(lInput, lInput.length - feedDelta.length)
-			if feedDelta.length > lInput.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - lInput.length)
+			[lInput, feedDelta] = fixLength(lInput, feedDelta)
 			lInput = talib.ADD
 				inReal0: lInput
 				inReal1: feedDelta
@@ -658,10 +659,7 @@ makeDelta = (instrument) ->
 			delta['correctedPrice'] = _.last(lInput)
 		when 'Long MA price'
 			lInput = processMA('NONE', 0, instrument)
-			if lInput.length > feedDelta.length
-				lInput = _.drop(lInput, lInput.length - feedDelta.length)
-			if feedDelta.length > lInput.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - lInput.length)
+			[lInput, feedDelta] = fixLength(lInput, feedDelta)
 			lInput = talib.ADD
 				inReal0: lInput
 				inReal1: feedDelta
@@ -671,10 +669,7 @@ makeDelta = (instrument) ->
 			delta['correctedPrice'] = _.last(lInput)
 		when 'Both MA prices'
 			lInput = processMA('NONE', 0, instrument)
-			if lInput.length > feedDelta.length
-				lInput = _.drop(lInput, lInput.length - feedDelta.length)
-			if feedDelta.length > lInput.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - lInput.length)
+			[lInput, feedDelta] = fixLength(lInput, feedDelta)
 			lInput = talib.ADD
 				inReal0: lInput
 				inReal1: feedDelta
@@ -684,10 +679,7 @@ makeDelta = (instrument) ->
 			long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
 			delta['correctedPrice'] = _.last(lInput)
 		when 'Short MA'
-			if short.length > feedDelta.length
-				short = _.drop(short, short.length - feedDelta.length)
-			if feedDelta.length > short.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - short.length)
+			[short, feedDelta] = fixLength(short, feedDelta)
 			short = talib.ADD
 				inReal0: short
 				inReal1: feedDelta
@@ -696,40 +688,28 @@ makeDelta = (instrument) ->
 			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
 		when 'Long MA'
 			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-			if long.length > feedDelta.length
-				long = _.drop(long, long.length - feedDelta.length)
-			if feedDelta.length > long.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - long.length)
+			[long, feedDelta] = fixLength(long, feedDelta)
 			long = talib.ADD
 				inReal0: long
 				inReal1: feedDelta
 				startIdx: 0
 				endIdx: feedDelta.length-1
 		when 'Both MA'
-			if short.length > feedDelta.length
-				short = _.drop(short, short.length - feedDelta.length)
-			if feedDelta.length > short.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - short.length)
+			[short, feedDelta] = fixLength(short, feedDelta)
 			short = talib.ADD
 				inReal0: short
 				inReal1: feedDelta
 				startIdx: 0
 				endIdx: feedDelta.length-1
 			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-			if long.length > feedDelta.length
-				long = _.drop(long, long.length - feedDelta.length)
-			if feedDelta.length > long.length
-				feedDelta = _.drop(feedDelta, feedDelta.length - long.length)
+			[long, feedDelta] = fixLength(long, feedDelta)
 			long = talib.ADD
 				inReal0: long
 				inReal1: feedDelta
 				startIdx: 0
 				endIdx: feedDelta.length-1
 	
-	if long.length > short.length
-		long = _.drop(long, long.length - short.length)
-	if short.length > long.length
-		short = _.drop(short, short.length - long.length)
+	[long, short] = fixLength(long, short)
 	shortLongDelta = talib.SUB
 		inReal0: short
 		inReal1: long
@@ -746,10 +726,7 @@ makeDelta = (instrument) ->
 	
 	if MACD_MA_T isnt 'NONE'
 		macd = processMA(MACD_MA_T, MACD_MA_P, shortLongDelta, true)
-		if macd.length > shortLongDelta.length
-			macd = _.drop(macd, macd.length - shortLongDelta.length)
-		if shortLongDelta.length > macd.length
-			shortLongDelta = _.drop(shortLongDelta, shortLongDelta.length - macd.length)
+		[macd, shortLongDelta] = fixLength(macd, shortLongDelta)
 		macdDelta = talib.SUB
 			inReal0: shortLongDelta
 			inReal1: macd
