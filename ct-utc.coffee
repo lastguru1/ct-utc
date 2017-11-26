@@ -51,6 +51,7 @@ LONG_MA_P = params.add 'Long MA period or parameters', '10'
 # Feedback works like that:
 # - calculate Feedback line using the given MA
 # - calculate Short-Feedback delta
+# - optionally: modify the delta using normalized volume information
 # - add the resulting delta to the price data to be used by Short and/or Long MA later, or to the MA results
 # The feedback can be modified (reduced) before being added
 FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA price', 'Long MA price', 'Both prices', 'Short MA', 'Long MA', 'Both MA'], 'Long MA'
@@ -58,6 +59,11 @@ FEED_DELTA_T = params.addOptions 'Feedback reduction type (NONE disables this fe
 FEED_DELTA_P = params.add 'Feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
 FEED_MA_P = params.add 'Feedback MA period or parameters', '10'
+
+# Volume normalization: Stochastic, Laguerre or Inverse Fisher Transformation
+# Volume is then normalized to 0..1 and serve as a multiplicator for the delta
+FEED_VOLUME_T = params.addOptions 'Volume feedback normalization', ['NONE', 'Stochastic', 'Laguerre', 'IFT'], 'NONE'
+FEED_VOLUME_P = params.add 'Volume feedback period (gamma (0..1) for Laguerre)', '14'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
@@ -92,7 +98,7 @@ OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
 OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
-# Oscillator normalization: Stochastic of Inverse Fisher Transformation
+# Oscillator normalization: Stochastic or Inverse Fisher Transformation
 OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT'], 'NONE'
 
 # What trigger to use for oscillator
@@ -101,6 +107,12 @@ OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 
 # Late: trigger when back within the bounds after crossing
 # NB: this has no effect if oscillator mode is "Zones"
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Draw only', 'Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
+
+# Which type of orders to use for trading
+ORDER_TYPE = params.addOptions 'Order type',['market','limit','iceberg'], 'limit'
+
+# For limit orders, we will not get the ticker price, so we try to increase/decrease the price
+ORDER_PRICE = params.add 'Trade at [Market Price x]', 1.01
 
 # TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
 
@@ -221,6 +233,20 @@ Stochastic = (n, i, instrument) ->
 		sto = 0
 	else
 		sto = 100 * (price - fl) / (fh - fl)
+	return sto
+
+SimpleStochastic = (n, i, instrument) ->
+	if i < (STOCH_LEN - 1)
+		slen = i + 1
+	else
+		slen = STOCH_LEN
+	for x in [(i - slen + 1)..i]
+		if not fh? or instrument[x] > fh then fh = instrument[x]
+		if not fl? or instrument[x] < fl then fl = instrument[x]
+	if not fh? or not fl? or (fh - fl) is 0
+		sto = 0
+	else
+		sto = 100 * (n - fl) / (fh - fl)
 	return sto
 
 IFT = (n) ->
@@ -637,8 +663,7 @@ processOSC = (selector, period, instrument, secondary = false) ->
 		when 'LRSI'
 			LGAMMA = period
 			price = processMA('NONE', 0, sInstrument)
-			_.map(price, LaguerreRSI)
-		
+			_.map(price, LaguerreRSI)		
 		when 'LMFI'
 			LGAMMA = period
 			price = talib.MULT
@@ -659,6 +684,25 @@ makeDelta = (instrument) ->
 			inReal1: feedback
 			startIdx: 0
 			endIdx: feedback.length-1
+		
+		if FEED_VOLUME_T isnt 'NONE'
+			switch FEED_VOLUME_T
+				when 'Stochastic'
+					STOCH_LEN = FEED_VOLUME_P
+					volume = _.map(instrument.volumes, SimpleStochastic)
+				when 'Laguerre'
+					LGAMMA = FEED_VOLUME_P
+					volume = _.map(instrument.volumes, LaguerreRSI)
+				when 'IFT'
+					volume = _.map(instrument.volumes, IFT)
+			[shortFeedbackDelta, volume] = fixLength(shortFeedbackDelta, volume)
+			REDUCE_BY = 100
+			volume = _.map(volume, feedbackDivide)
+			feedbackDivide = talib.MULT
+				inReal0: feedbackDivide
+				inReal1: volume
+				startIdx: 0
+				endIdx: volume.length-1
 		
 		REDUCE_BY = FEED_DELTA_P
 		switch FEED_DELTA_T
@@ -970,8 +1014,24 @@ handle: ->
 	if score is 1 and storage.lastAction isnt 1
 		storage.lastAction = 1
 		if curBase isnt 0
-			trading.buy instrument, 'market'
+			ticker = trading.getTicker instrument
+			price = ticker.sell*ORDER_PRICE
+			amount = curBase/price
+			trading.buy instrument, ORDER_TYPE, amount, price, 60 * 10
+			storage.lastBuyPrice = price
+			if price <= storage.lastSellPrice
+				storage.wonTrades = storage.wonTrades + 1
+			else
+				storage.lostTrades = storage.lostTrades + 1
 	if score is -1 and storage.lastAction isnt -1
 		storage.lastAction = -1
 		if curAsset isnt 0
-			trading.sell instrument, 'market'
+			ticker = trading.getTicker instrument
+			price = ticker.buy/ORDER_PRICE
+			amount = curAsset
+			trading.sell instrument, ORDER_TYPE, amount, price, 60 * 10
+			storage.lastSellPrice = price
+			if price >= storage.lastBuyPrice
+				storage.wonTrades = storage.wonTrades + 1
+			else
+				storage.lostTrades = storage.lostTrades + 1
