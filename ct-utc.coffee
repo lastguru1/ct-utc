@@ -40,39 +40,41 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # EVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
-SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'SMA'
+SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
 SHORT_MA_P = params.add 'Short MA period or parameters', '10'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'SMA'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '10'
 
-# Feedback can be applied on the price data used by MA calculations
-# Delta feedback works like that:
+# Feedback can be applied on the price data or MA used by MA calculations
+# Feedback works like that:
 # - calculate Feedback line using the given MA
 # - calculate Short-Feedback delta
 # - add the resulting delta to the price data to be used by Short and/or Long MA later, or to the MA results
 # The feedback can be modified (reduced) before being added
 FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA price', 'Long MA price', 'Both prices', 'Short MA', 'Long MA', 'Both MA'], 'Long MA'
-FEED_DELTA_T = params.addOptions 'Delta feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
-FEED_DELTA_P = params.add 'Delta feedback reduction value', 1
-FEED_MA_T = params.addOptions 'Delta feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'SMA'
-FEED_MA_P = params.add 'Delta feedback MA period or parameters', '10'
+FEED_DELTA_T = params.addOptions 'Feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
+FEED_DELTA_P = params.add 'Feedback reduction value', 1
+FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
+FEED_MA_P = params.add 'Feedback MA period or parameters', '10'
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'NONE'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
 MACD_MA_P = params.add 'MACD MA period or parameters', '10'
 
 # High and low thresholds in percentage of the closing price
 HI_THRESHOLD = params.add 'High threshold', 2
 LO_THRESHOLD = params.add 'Low threshold', -1.5
 
-# We can use crossings and/or oscillator to detect opportunities. "Thresholds" disables trading if MA delta is within the thresholds
-OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds'], 'Regular'
+# We can use crossings and/or oscillator to detect opportunities.
+# Thresholds - disables oscillator trade signals if MA delta is within the thresholds
+# Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
+OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds', 'Zones'], 'Regular'
 
 # We may want to smooth the data before making an oscillator
-OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'NONE'
+OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
 OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 
 # The following oscillators can be used:
@@ -87,7 +89,7 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'EVWMA'], 'NONE'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
 OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
 # Oscillator normalization: Stochastic of Inverse Fisher Transformation
@@ -97,6 +99,7 @@ OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 
 # Early: trigger once crossed
 # Extreme: trigger once change direction (provisional top/bottom) after crossing
 # Late: trigger when back within the bounds after crossing
+# NB: this has no effect if oscillator mode is "Zones"
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Draw only', 'Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
 # TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
@@ -553,6 +556,27 @@ processMA = (selector, period, instrument, secondary = false) ->
 					wr = mwma
 			REDUCE_BY = i
 			_.map(wr, feedbackDivide)
+		when 'VWMA'
+			vp = talib.MULT
+				inReal0: sInput
+				inReal1: sInstrument.volumes
+				startIdx: 0
+				endIdx: sInput.length-1
+			svp = talib.SMA
+				inReal: vp
+				startIdx: 0
+				endIdx: vp.length-1
+				optInTimePeriod: period
+			sv = talib.SMA
+				inReal: sInstrument.volumes
+				startIdx: 0
+				endIdx: sInstrument.volumes.length-1
+				optInTimePeriod: period
+			talib.DIV
+				inReal0: svp
+				inReal1: sv
+				startIdx: 0
+				endIdx: sv.length-1
 		when 'EVWMA'
 			EV_LEN = period
 			eInstrument = []
@@ -805,6 +829,13 @@ makeOsc = (instrument) ->
 	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.lastDelta > CURR_LO_THRESHOLD and storage.lastDelta < CURR_HI_THRESHOLD
 		storage.scoreOsc = 0
 	
+	if OSC_MODE is 'Zones' and SHORT_MA_T isnt 'NONE'
+		storage.scoreOsc = 0
+		if storage.scoreDelta is 1 and oscResult >= (100 - OSC_THRESHOLD)
+			storage.scoreOsc = -1
+		if storage.scoreDelta is -1 and oscResult <= OSC_THRESHOLD
+			storage.scoreOsc = 1
+	
 	storage.lastOsc = oscResult
 	return _.last(osc)
 
@@ -936,9 +967,9 @@ handle: ->
 	score = storage.scoreDelta + storage.scoreOsc
 	plot
 		Score: score
-	if score is 1 and storage.lastAction isnt 1
+	if score is 1 and storage.lastAction isnt 1 and curBase isnt 0
 		storage.lastAction = 1
-		trading.buy instrument
-	if score is -1 and storage.lastAction isnt -1
+		trading.buy instrument, 'market'
+	if score is -1 and storage.lastAction isnt -1 and curAsset isnt 0
 		storage.lastAction = -1
-		trading.sell instrument
+		trading.sell instrument, 'market'
