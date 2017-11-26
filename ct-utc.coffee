@@ -698,8 +698,8 @@ makeDelta = (instrument) ->
 			[shortFeedbackDelta, volume] = fixLength(shortFeedbackDelta, volume)
 			REDUCE_BY = 100
 			volume = _.map(volume, feedbackDivide)
-			feedbackDivide = talib.MULT
-				inReal0: feedbackDivide
+			shortFeedbackDelta = talib.MULT
+				inReal0: shortFeedbackDelta
 				inReal1: volume
 				startIdx: 0
 				endIdx: volume.length-1
