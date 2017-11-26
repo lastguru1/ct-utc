@@ -296,12 +296,12 @@ sigRound = (n, sig) ->
 
 processMA = (selector, period, instrument, secondary = false) ->
 	if secondary
-		sInstrument = ['low', 'high', 'close']
+		sInstrument = ['low', 'high', 'close', 'volumes']
 		sInstrument.low = instrument
 		sInstrument.high = instrument
 		sInstrument.close = instrument
 		sInstrument.volumes = @data.instruments[0].volumes
-		sInstrument.volumes = _.drop(sInstrument.volumes, sInstrument.volumes.length - instrument.high.length)
+		sInstrument.volumes = _.drop(sInstrument.volumes, sInstrument.volumes.length - sInstrument.high.length)
 	else
 		sInstrument = instrument
 	
@@ -554,7 +554,7 @@ processMA = (selector, period, instrument, secondary = false) ->
 			REDUCE_BY = i
 			_.map(wr, feedbackDivide)
 		when 'EVWMA'
-			EVWMA_LEN = period
+			EV_LEN = period
 			eInstrument = []
 			for x in [0..sInstrument.high.length-1]
 				eInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x], volume: sInstrument.volumes[x]}
@@ -644,70 +644,72 @@ makeDelta = (instrument) ->
 				feedDelta = _.map(shortFeedbackDelta, feedbackRoot)
 			when 'Logarithm'
 				feedDelta = _.map(shortFeedbackDelta, feedbackLog)
-	
-	switch FEED_APPLY
-		when 'Short MA price'
-			lInput = processMA('NONE', 0, instrument)
-			[lInput, feedDelta] = fixLength(lInput, feedDelta)
-			lInput = talib.ADD
-				inReal0: lInput
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-			short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
-			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-			delta['correctedPrice'] = _.last(lInput)
-		when 'Long MA price'
-			lInput = processMA('NONE', 0, instrument)
-			[lInput, feedDelta] = fixLength(lInput, feedDelta)
-			lInput = talib.ADD
-				inReal0: lInput
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-			long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
-			delta['correctedPrice'] = _.last(lInput)
-		when 'Both MA prices'
-			lInput = processMA('NONE', 0, instrument)
-			[lInput, feedDelta] = fixLength(lInput, feedDelta)
-			lInput = talib.ADD
-				inReal0: lInput
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-			short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
-			long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
-			delta['correctedPrice'] = _.last(lInput)
-		when 'Short MA'
-			[short, feedDelta] = fixLength(short, feedDelta)
-			short = talib.ADD
-				inReal0: short
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-		when 'Long MA'
-			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-			[long, feedDelta] = fixLength(long, feedDelta)
-			long = talib.ADD
-				inReal0: long
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-		when 'Both MA'
-			[short, feedDelta] = fixLength(short, feedDelta)
-			short = talib.ADD
-				inReal0: short
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
-			long = processMA(LONG_MA_T, LONG_MA_P, instrument)
-			[long, feedDelta] = fixLength(long, feedDelta)
-			long = talib.ADD
-				inReal0: long
-				inReal1: feedDelta
-				startIdx: 0
-				endIdx: feedDelta.length-1
+		
+		switch FEED_APPLY
+			when 'Short MA price'
+				lInput = processMA('NONE', 0, instrument)
+				[lInput, feedDelta] = fixLength(lInput, feedDelta)
+				lInput = talib.ADD
+					inReal0: lInput
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+				short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
+				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				delta['correctedPrice'] = _.last(lInput)
+			when 'Long MA price'
+				lInput = processMA('NONE', 0, instrument)
+				[lInput, feedDelta] = fixLength(lInput, feedDelta)
+				lInput = talib.ADD
+					inReal0: lInput
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+				long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+				delta['correctedPrice'] = _.last(lInput)
+			when 'Both MA prices'
+				lInput = processMA('NONE', 0, instrument)
+				[lInput, feedDelta] = fixLength(lInput, feedDelta)
+				lInput = talib.ADD
+					inReal0: lInput
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+				short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
+				long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+				delta['correctedPrice'] = _.last(lInput)
+			when 'Short MA'
+				[short, feedDelta] = fixLength(short, feedDelta)
+				short = talib.ADD
+					inReal0: short
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+			when 'Long MA'
+				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				[long, feedDelta] = fixLength(long, feedDelta)
+				long = talib.ADD
+					inReal0: long
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+			when 'Both MA'
+				[short, feedDelta] = fixLength(short, feedDelta)
+				short = talib.ADD
+					inReal0: short
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				[long, feedDelta] = fixLength(long, feedDelta)
+				long = talib.ADD
+					inReal0: long
+					inReal1: feedDelta
+					startIdx: 0
+					endIdx: feedDelta.length-1
+	else
+		long = processMA(LONG_MA_T, LONG_MA_P, instrument)
 	
 	[long, short] = fixLength(long, short)
 	shortLongDelta = talib.SUB
