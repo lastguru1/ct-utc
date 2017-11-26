@@ -60,10 +60,11 @@ FEED_DELTA_P = params.add 'Feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
 FEED_MA_P = params.add 'Feedback MA period or parameters', '10'
 
-# Volume normalization: Stochastic, Laguerre or Inverse Fisher Transformation
-# Volume is then normalized to 0..1 and serve as a multiplicator for the delta
-FEED_VOLUME_T = params.addOptions 'Volume feedback normalization', ['NONE', 'Stochastic', 'Laguerre', 'IFT'], 'NONE'
+# Volume normalization: Stochastic or Laguerre
+# Volume is then normalized to (1-weight)..1 and serve as a multiplicator for the delta
+FEED_VOLUME_T = params.addOptions 'Volume feedback normalization', ['NONE', 'Stochastic', 'Laguerre'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback period (gamma (0..1) for Laguerre)', '14'
+FEED_VOLUME_W = params.add 'Volume feedback weight (0..1)', 0.2
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
@@ -135,6 +136,9 @@ CURR_LO_THRESHOLD = 0
 
 feedbackSign = (n) ->
 	return Math.sign(n)
+
+feedbackAdd = (n) ->
+	return n + REDUCE_BY
 
 feedbackDivide = (n) ->
 	return n/REDUCE_BY
@@ -693,11 +697,11 @@ makeDelta = (instrument) ->
 				when 'Laguerre'
 					LGAMMA = FEED_VOLUME_P
 					volume = _.map(instrument.volumes, LaguerreRSI)
-				when 'IFT'
-					volume = _.map(instrument.volumes, IFT)
 			[shortFeedbackDelta, volume] = fixLength(shortFeedbackDelta, volume)
-			REDUCE_BY = 100
+			REDUCE_BY = 100/FEED_VOLUME_W
 			volume = _.map(volume, feedbackDivide)
+			REDUCE_BY = 1-FEED_VOLUME_W
+			volume = _.map(volume, feedbackAdd)
 			shortFeedbackDelta = talib.MULT
 				inReal0: shortFeedbackDelta
 				inReal1: volume
@@ -973,7 +977,7 @@ handle: ->
 	debug "Starting " + baseName + ": " + _.round(storage.startBase, 2) + " | Starting " + assetName + ": " + _.round(storage.startAsset, 2) + " | Starting " + baseName + " equivalent: " + _.round(startBaseEquiv, 2)
 	debug "Current " + baseName + ": " + _.round(curBase, 2) + " | Current " + assetName + ": " + _.round(curAsset, 2) + " | Current " + baseName + " equivalent: " + _.round(curBaseEquiv, 2)
 	debug "Starting price: " + sigRound(storage.startPrice, 5) + " | Current price: " + sigRound(close, 5)
-	debug "Trades: " + (storage.wonTrades + storage.lostTrades) + " | Won: " + storage.wonTrades + " | Lost: " + storage.lostTrades + " | W/L: " + _.round(100 * storage.winTrades / (storage.wonTrades + storage.lostTrades), 2) + "%"
+	debug "Trades: " + (storage.wonTrades + storage.lostTrades) + " | Won: " + storage.wonTrades + " | Lost: " + storage.lostTrades + " | W/L: " + _.round(100 * storage.wonTrades / (storage.wonTrades + storage.lostTrades), 2) + "%"
 	debug "Buy and Hold efficiency: " + _.round(gainBH, 2) + "% | Bot efficiency: " + _.round(gainBot, 2) + "%"
 	# Set oscillator scale and position
 	storage.oscHigh ?= close * 0.75
