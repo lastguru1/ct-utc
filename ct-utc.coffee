@@ -965,11 +965,13 @@ handle: ->
 			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			Oscillator: storage.oscLow + osc * (storage.oscHigh - storage.oscLow) / 100
 	score = storage.scoreDelta + storage.scoreOsc
-	plot
-		Score: score
-	if score is 1 and storage.lastAction isnt 1 and curBase isnt 0
+#	plot
+#		Score: score
+	if score is 1 and storage.lastAction isnt 1
 		storage.lastAction = 1
-		trading.buy instrument, 'market'
-	if score is -1 and storage.lastAction isnt -1 and curAsset isnt 0
+		if curBase isnt 0
+			trading.buy instrument, 'market'
+	if score is -1 and storage.lastAction isnt -1
 		storage.lastAction = -1
-		trading.sell instrument, 'market'
+		if curAsset isnt 0
+			trading.sell instrument, 'market'
