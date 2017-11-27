@@ -40,12 +40,12 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # EVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
-SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
-SHORT_MA_P = params.add 'Short MA period or parameters', '10'
+SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+SHORT_MA_P = params.add 'Short MA period or parameters', '12'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
-LONG_MA_P = params.add 'Long MA period or parameters', '10'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+LONG_MA_P = params.add 'Long MA period or parameters', '26'
 
 # Feedback can be applied on the price data or MA used by MA calculations
 # Feedback works like that:
@@ -68,17 +68,17 @@ FEED_VOLUME_W = params.add 'Volume feedback weight (0..1)', 0.2
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
-MACD_MA_P = params.add 'MACD MA period or parameters', '10'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+MACD_MA_P = params.add 'MACD MA period or parameters', '9'
 
 # High and low thresholds in percentage of the closing price
-HI_THRESHOLD = params.add 'High threshold', 2
-LO_THRESHOLD = params.add 'Low threshold', -1.5
+HI_THRESHOLD = params.add 'High threshold', 0.075
+LO_THRESHOLD = params.add 'Low threshold', -0.05
 
 # We can use crossings and/or oscillator to detect opportunities.
 # Thresholds - disables oscillator trade signals if MA delta is within the thresholds
 # Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
-OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds', 'Zones'], 'Regular'
+OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds', 'Zones'], 'NONE'
 
 # We may want to smooth the data before making an oscillator
 OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
@@ -113,7 +113,7 @@ OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Draw only', 'Early', 'Ex
 ORDER_TYPE = params.addOptions 'Order type',['market','limit','iceberg'], 'limit'
 
 # For limit orders, we will not get the ticker price, so we try to increase/decrease the price
-ORDER_PRICE = params.add 'Trade at [Market Price x]', 1.01
+ORDER_PRICE = params.add 'Trade at [Market Price x]', 1.003
 
 # TODO: Check if Coppock curve (extremes only - not crossings; thresholds could be needed) is useful
 
@@ -1021,7 +1021,7 @@ handle: ->
 			ticker = trading.getTicker instrument
 			price = ticker.sell*ORDER_PRICE
 			amount = curBase/price
-			trading.buy instrument, ORDER_TYPE, amount, price, 60 * 10
+			trading.buy instrument, ORDER_TYPE, amount, price, 60
 			storage.lastBuyPrice = price
 			if price <= storage.lastSellPrice
 				storage.wonTrades = storage.wonTrades + 1
@@ -1033,7 +1033,7 @@ handle: ->
 			ticker = trading.getTicker instrument
 			price = ticker.buy/ORDER_PRICE
 			amount = curAsset
-			trading.sell instrument, ORDER_TYPE, amount, price, 60 * 10
+			trading.sell instrument, ORDER_TYPE, amount, price, 60
 			storage.lastSellPrice = price
 			if price >= storage.lastBuyPrice
 				storage.wonTrades = storage.wonTrades + 1
