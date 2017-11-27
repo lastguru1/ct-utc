@@ -76,9 +76,12 @@ HI_THRESHOLD = params.add 'High threshold', 0.075
 LO_THRESHOLD = params.add 'Low threshold', -0.05
 
 # We can use crossings and/or oscillator to detect opportunities.
-# Thresholds - disables oscillator trade signals if MA delta is within the thresholds
+# Draw only - no oscillator trading - just draw it in the chart
+# Regular - trade with oscillator signals
+# Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within the thresholds
 # Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
-OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Regular', 'Thresholds', 'Zones'], 'NONE'
+# Reverse thresholds - if oscillator is outside its thresholds, allow buys or sells early - within the crossing thresholds
+OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Draw only', 'Regular', 'Thresholds', 'Zones', 'Reverse thresholds'], 'NONE'
 
 # We may want to smooth the data before making an oscillator
 OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
@@ -107,10 +110,10 @@ OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 
 # Extreme: trigger once change direction (provisional top/bottom) after crossing
 # Late: trigger when back within the bounds after crossing
 # NB: this has no effect if oscillator mode is "Zones"
-OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Draw only', 'Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
+OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
 # Which type of orders to use for trading
-ORDER_TYPE = params.addOptions 'Order type',['market','limit','iceberg'], 'limit'
+ORDER_TYPE = params.addOptions 'Order type', ['market', 'limit', 'iceberg'], 'limit'
 
 # For limit orders, we will not get the ticker price, so we try to increase/decrease the price
 ORDER_PRICE = params.add 'Trade at [Market Price x]', 1.003
@@ -793,7 +796,7 @@ makeDelta = (instrument) ->
 	delta['long'] = _.last(long)
 	delta['shortLongDelta'] = _.last(shortLongDelta)
 	deltaResult = _.last(shortLongDelta)
-
+	
 	if FEED_DELTA_T isnt 'NONE'
 		delta['feedback'] = _.last(feedback)
 		delta['shortFeedbackDelta'] = _.last(shortFeedbackDelta)	
@@ -810,13 +813,14 @@ makeDelta = (instrument) ->
 		delta['macdDelta'] = _.last(macdDelta)
 		deltaResult = _.last(macdDelta)
 	
-	if storage.lastDelta < CURR_HI_THRESHOLD and deltaResult >= CURR_HI_THRESHOLD
-		storage.scoreDelta = 1
-	else if storage.lastDelta > CURR_LO_THRESHOLD and deltaResult <= CURR_LO_THRESHOLD
-		storage.scoreDelta = -1
+	storage.lastDeltaPos = storage.DeltaPos
+	delta['deltaResult'] = deltaResult
+	if deltaResult > CURR_HI_THRESHOLD and deltaResult > CURR_LO_THRESHOLD
+		storage.DeltaPos = 1
+	else if deltaResult < CURR_HI_THRESHOLD and deltaResult < CURR_LO_THRESHOLD
+		storage.DeltaPos = -1
 	else
-		storage.scoreDelta = 0
-	storage.lastDelta = deltaResult
+		storage.DeltaPos = 0
 	return delta
 
 makeOsc = (instrument) ->
@@ -835,57 +839,86 @@ makeOsc = (instrument) ->
 	osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
 	oscResult = _.last(osc)
 	
-	switch OSC_TRIGGER
-		when 'Draw only'
-			storage.scoreOsc = 0		
-		when 'Early'
-			if storage.lastOsc > OSC_THRESHOLD and oscResult <= OSC_THRESHOLD
-				storage.scoreOsc = 1
-			else if storage.lastOsc < (100 - OSC_THRESHOLD) and oscResult >= (100 - OSC_THRESHOLD)
-				storage.scoreOsc = -1
-			else
-				storage.scoreOsc = 0
-		when 'Extreme'
-			if storage.lastOsc <= oscResult and oscResult <= OSC_THRESHOLD
-				storage.scoreOsc = 1
-			else if storage.lastOsc >= oscResult and oscResult >= (100 - OSC_THRESHOLD)
-				storage.scoreOsc = -1
-			else
-				storage.scoreOsc = 0
-		when 'Late'
-			if storage.lastOsc < OSC_THRESHOLD and oscResult >= OSC_THRESHOLD
-				storage.scoreOsc = 1
-			else if storage.lastOsc > (100 - OSC_THRESHOLD) and oscResult <= (100 - OSC_THRESHOLD)
-				storage.scoreOsc = -1
-			else
-				storage.scoreOsc = 0
-		when 'Buy early, sell late'
-			if storage.lastOsc > OSC_THRESHOLD and oscResult <= OSC_THRESHOLD
-				storage.scoreOsc = 1
-			else if storage.lastOsc > (100 - OSC_THRESHOLD) and oscResult <= (100 - OSC_THRESHOLD)
-				storage.scoreOsc = -1
-			else
-				storage.scoreOsc = 0
-		when 'Buy late, sell early'
-			if storage.lastOsc < OSC_THRESHOLD and oscResult >= OSC_THRESHOLD
-				storage.scoreOsc = 1
-			else if storage.lastOsc < (100 - OSC_THRESHOLD) and oscResult >= (100 - OSC_THRESHOLD)
-				storage.scoreOsc = -1
-			else
-				storage.scoreOsc = 0	
-	
-	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.lastDelta > CURR_LO_THRESHOLD and storage.lastDelta < CURR_HI_THRESHOLD
-		storage.scoreOsc = 0
-	
-	if OSC_MODE is 'Zones' and SHORT_MA_T isnt 'NONE'
-		storage.scoreOsc = 0
-		if storage.scoreDelta is 1 and oscResult >= (100 - OSC_THRESHOLD)
-			storage.scoreOsc = -1
-		if storage.scoreDelta is -1 and oscResult <= OSC_THRESHOLD
-			storage.scoreOsc = 1
-	
-	storage.lastOsc = oscResult
+	storage.lastOscPos = storage.OscPos
+	if oscResult < OSC_THRESHOLD
+		storage.OscPos = 1
+	else if oscResult > (100 - OSC_THRESHOLD)
+		storage.OscPos = -1
+	else
+		storage.OscPos = 0
 	return _.last(osc)
+
+getAction = (delta, osc) ->
+	dscore = 0
+	oscore = 0
+	if OSC_MODE is 'NONE' or OSC_MODE is 'Regular' or OSC_MODE is 'Thresholds'
+		if storage.lastDeltaPos <= 0 and storage.DeltaPos is 1
+			dscore = 1
+		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1
+			dscore = -1
+		else
+			dscore = 0
+	else if OSC_MODE is 'Zones'
+		if storage.lastDeltaPos <= 0 and storage.DeltaPos is 1 and storage.OscPos isnt -1
+			dscore = 1
+		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1 and storage.OscPos isnt 1
+			dscore = -1
+		else
+			dscore = 0
+	else if OSC_MODE is 'Reverse thresholds'
+		if storage.lastDeltaPos <= 0 and storage.DeltaPos is 1 and storage.OscPos isnt 1
+			dscore = 1
+		else if storage.lastDeltaPos <= 0 and storage.DeltaPos isnt -1 and storage.OscPos is 1
+			dscore = 1
+		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1 and storage.OscPos isnt -1
+			dscore = -1
+		else if storage.lastDeltaPos >= 0 and storage.DeltaPos isnt 1 and storage.OscPos is -1
+			dscore = -1
+		else
+			dscore = 0
+	
+	if OSC_MODE is 'Regular' or OSC_MODE is 'Thresholds'
+		switch OSC_TRIGGER
+			when 'Early'
+				if storage.OscPos is 1 and storage.lastOscPos isnt 1
+					oscore = 1
+				else if storage.OscPos is -1 and storage.lastOscPos isnt -1
+					oscore = -1
+				else
+					oscore = 0
+			when 'Extreme'
+				if storage.OscPos is 1 and storage.lastOsc <= osc
+					oscore = 1
+				else if storage.OscPos is -1 and storage.lastOsc >= osc
+					oscore = -1
+				else
+					oscore = 0
+			when 'Late'
+				if storage.OscPos isnt 1 and storage.lastOscPos is 1
+					oscore = 1
+				else if storage.OscPos isnt -1 and storage.lastOscPos is -1
+					oscore = -1
+				else
+					oscore = 0
+			when 'Buy early, sell late'
+				if storage.OscPos is 1 and storage.lastOscPos isnt 1
+					oscore = 1
+				else if storage.OscPos isnt -1 and storage.lastOscPos is -1
+					oscore = -1
+				else
+					oscore = 0
+			when 'Buy late, sell early'
+				if storage.OscPos isnt 1 and storage.lastOscPos is 1
+					oscore = 1
+				else if storage.OscPos is -1 and storage.lastOscPos isnt -1
+					oscore = -1
+				else
+					oscore = 0
+	
+	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.DeltaPos is 0
+		oscore = 0
+	
+	return dscore + oscore
 
 init: ->
 	# All the plotlines
@@ -953,8 +986,10 @@ handle: ->
 	storage.lastDelta ?= 0
 	storage.lastOsc ?= 0
 	storage.lastAction ?= 0
-	storage.scoreDelta ?= 0
-	storage.scoreOsc ?= 0
+	storage.lastDeltaPos ?= 0
+	storage.lastOscPos ?= 0
+	storage.DeltaPos ?= 0
+	storage.OscPos ?= 0
 	storage.wonTrades ?= 0
 	storage.lostTrades ?= 0
 	storage.startBase ?= @portfolios[instrument.market].positions[instrument.base()].amount
@@ -1012,28 +1047,31 @@ handle: ->
 			HighOsc: storage.oscHigh - OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			Oscillator: storage.oscLow + osc * (storage.oscHigh - storage.oscLow) / 100
-	score = storage.scoreDelta + storage.scoreOsc
+	action = getAction(delta.deltaResult, osc)
+	storage.lastDelta = delta.deltaResult
+	storage.lastOsc = osc
+	
 #	plot
-#		Score: score
-	if score is 1 and storage.lastAction isnt 1
+#		Score: action
+	if action > 0 and storage.lastAction isnt 1
 		storage.lastAction = 1
 		if curBase isnt 0
 			ticker = trading.getTicker instrument
 			price = ticker.sell*ORDER_PRICE
 			amount = curBase/price
-			trading.buy instrument, ORDER_TYPE, amount, price, 60
+			trading.buy instrument, ORDER_TYPE, amount, price, 60 * @config.interval
 			storage.lastBuyPrice = price
 			if price <= storage.lastSellPrice
 				storage.wonTrades = storage.wonTrades + 1
 			else
 				storage.lostTrades = storage.lostTrades + 1
-	if score is -1 and storage.lastAction isnt -1
+	if action < 0 and storage.lastAction isnt -1
 		storage.lastAction = -1
 		if curAsset isnt 0
 			ticker = trading.getTicker instrument
 			price = ticker.buy/ORDER_PRICE
 			amount = curAsset
-			trading.sell instrument, ORDER_TYPE, amount, price, 60
+			trading.sell instrument, ORDER_TYPE, amount, price, 60 * @config.interval
 			storage.lastSellPrice = price
 			if price >= storage.lastBuyPrice
 				storage.wonTrades = storage.wonTrades + 1
