@@ -37,7 +37,6 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 # WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA, but with WMA as its base)
-# VWMA - Volume Weighted Moving Average
 # EVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
@@ -110,7 +109,7 @@ OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 
 # Early: trigger once crossed
 # Extreme: trigger once change direction (provisional top/bottom) after crossing
 # Late: trigger when back within the bounds after crossing
-# NB: this has no effect if oscillator mode is "Zones"
+# NB: this has effect only if oscillator mode is "Regular" or "Thresholds"
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
 # Which type of orders to use for trading
