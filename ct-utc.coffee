@@ -37,6 +37,7 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
 # WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA, but with WMA as its base)
+# VWMA - Volume Weighted Moving Average
 # EVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
