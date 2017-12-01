@@ -82,7 +82,9 @@ LO_THRESHOLD = params.add 'Low threshold', -0.05
 # Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within the thresholds
 # Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
 # Reverse thresholds - if oscillator is outside its thresholds, allow buys or sells early - within the crossing thresholds
-OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Draw only', 'Regular', 'Thresholds', 'Zones', 'Reverse thresholds'], 'NONE'
+# Both - only buy if crossing happened while in the respective oscillator position
+# Wait for both - trade once both crossing and oscillator are in a position
+OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Draw only', 'Regular', 'Thresholds', 'Zones', 'Reverse thresholds', 'Both', 'Wait for both'], 'NONE'
 
 # We may want to smooth the data before making an oscillator
 OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
@@ -877,6 +879,20 @@ getAction = (delta, osc) ->
 		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1 and storage.OscPos isnt -1
 			dscore = -1
 		else if storage.lastDeltaPos >= 0 and storage.DeltaPos isnt 1 and storage.OscPos is -1
+			dscore = -1
+		else
+			dscore = 0
+	else if OSC_MODE is 'Both'
+		if storage.lastDeltaPos <= 0 and storage.DeltaPos is 1 and storage.OscPos is 1
+			dscore = 1
+		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1 and storage.OscPos is -1
+			dscore = -1
+		else
+			dscore = 0
+	else if OSC_MODE is 'Wait for both'
+		if storage.lastAction isnt 1 and storage.DeltaPos is 1 and storage.OscPos is 1
+			dscore = 1
+		else if storage.lastAction isnt -1 and storage.DeltaPos is -1 and storage.OscPos is -1
 			dscore = -1
 		else
 			dscore = 0
