@@ -113,6 +113,9 @@ OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 
 # NB: this has effect only if oscillator mode is "Regular" or "Thresholds"
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
+# Stop loss is losses are higher than this percentage
+STOP_LOSS = params.add 'Stop loss % (0 for none)', 0
+
 # Which type of orders to use for trading
 ORDER_TYPE = params.addOptions 'Order type', ['market', 'limit', 'iceberg'], 'limit'
 
@@ -970,7 +973,9 @@ init: ->
 		Score:
 			color: 'red'
 			secondary: true
-	
+		StopLoss:
+			color: 'black'
+		
 	info "Welcome to Cryptotrader Universal Trading Constructor bot by lastguru"
 	info "Newest code is available here: https://github.com/lastguru1/ct-utc"
 
@@ -1051,6 +1056,11 @@ handle: ->
 	action = getAction(delta.deltaResult, osc)
 	storage.lastDelta = delta.deltaResult
 	storage.lastOsc = osc
+	
+	if storage.lastAction is 1 and STOP_LOSS > 0 and close < storage.lastBuyPrice * (100-STOP_LOSS)/100
+		action = -1
+		plotMark
+			StopLoss: close
 	
 #	plot
 #		Score: action
