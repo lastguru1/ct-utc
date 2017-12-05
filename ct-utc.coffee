@@ -857,7 +857,7 @@ makeOsc = (instrument) ->
 getAction = (delta, osc) ->
 	dscore = 0
 	oscore = 0
-	if OSC_MODE is 'NONE' or OSC_MODE is 'Regular' or OSC_MODE is 'Thresholds'
+	if OSC_MODE is 'NONE' or OSC_MODE is 'Draw only' or OSC_MODE is 'Regular' or OSC_MODE is 'Thresholds'
 		if storage.lastDeltaPos <= 0 and storage.DeltaPos is 1
 			dscore = 1
 		else if storage.lastDeltaPos >= 0 and storage.DeltaPos is -1
