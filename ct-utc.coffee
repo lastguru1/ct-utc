@@ -16,8 +16,12 @@ params = require 'params'
 # Strategy definition. If entered, all other options are ignored. Used for fast parameter reuse and sharing.
 # STRATEGY = params.add 'Strategy definition', ''
 
-# What data input to use for MAs that only take one input: Close Price or Weighted Close Price
-DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], 'Close'
+# Price input data can be modified:
+# Close - no modification
+# Typical - set Typical price as close price
+# Weighted - set Weighted price as close price
+# Heikin-Ashi - modify all prices according to Heikin-Ashi algorithm
+DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted', 'Heikin-Ashi'], 'Close'
 
 # The following MAs can be used:
 # SMA  - Simple Moving Average
@@ -176,13 +180,7 @@ EVWMA = (n, i, instrument) ->
 	if i is 0
 		EV_PREV = 0
 	cumv = 0
-	switch DATA_INPUT
-		when 'Close'
-			price = n.close
-		when 'Typical'
-			price = (n.close + n.low + n.high) / 3
-		when 'Weighted'
-			price = (n.close*2 + n.low + n.high) / 4
+	price = n.close
 	if i < (EV_LEN - 1)
 		flen = i + 1
 	else
@@ -232,13 +230,7 @@ LaguerreRSI = (n, i) ->
 	return lrsi
 
 Stochastic = (n, i, instrument) ->
-	switch DATA_INPUT
-		when 'Close'
-			price = n.close
-		when 'Typical'
-			price = (n.close + n.low + n.high) / 3
-		when 'Weighted'
-			price = (n.close*2 + n.low + n.high) / 4
+	price = n.close
 	if i < (STOCH_LEN - 1)
 		slen = i + 1
 	else
@@ -276,13 +268,7 @@ FT = (n, i, instrument) ->
 	if i is 0
 		FT_PREV = 0
 		FT_V1 = 0
-	switch DATA_INPUT
-		when 'Close'
-			price = n.close
-		when 'Typical'
-			price = (n.close + n.low + n.high) / 3
-		when 'Weighted'
-			price = (n.close*2 + n.low + n.high) / 4
+	price = n.close
 	if i < (FT_LEN - 1)
 		flen = i + 1
 	else
@@ -324,13 +310,7 @@ ALMA = (n, i, instrument) ->
 	return alma / wSum
 
 FRAMA = (n, i, instrument) ->
-	switch DATA_INPUT
-		when 'Close'
-			price = n.close
-		when 'Typical'
-			price = (n.close + n.low + n.high) / 3
-		when 'Weighted'
-			price = (n.close*2 + n.low + n.high) / 4
+	price = n.close
 	if i < (FRAMA_LEN - 1)
 		FRAMA_PREV = price
 		return price
@@ -359,6 +339,48 @@ sigRound = (n, sig) ->
 	mult = Math.pow(10, sig - Math.floor(Math.log(n) / Math.LN10) - 1)
 	Math.round(n * mult) / mult
 
+makeInstrument = (instrument) ->
+	switch DATA_INPUT
+		when 'Typical'
+			instrument.close = talib.TYPPRICE
+				high: instrument.high
+				low: instrument.low
+				close: instrument.close
+				startIdx: 0
+				endIdx: instrument.close.length-1
+		when 'Weighted'
+			instrument.close = talib.WCLPRICE
+				high: instrument.high
+				low: instrument.low
+				close: instrument.close
+				startIdx: 0
+				endIdx: instrument.close.length-1
+		when 'Heikin-Ashi'
+			close = talib.AVGPRICE
+				open: instrument.open
+				high: instrument.high
+				low: instrument.low
+				close: instrument.close
+				startIdx: 0
+				endIdx: instrument.close.length-1
+			open = []
+			prev = (instrument.close[0] + instrument.open[0]) / 2
+			for x in [0..instrument.close.length-2]
+				open[x] = (close[x] + prev) / 2
+				prev = open[x]
+			close = _.drop(close, 1)
+			high = []
+			low = []
+			for x in [1..instrument.close.length-1]
+				high[x-1] = Math.max(instrument.high[x], open[x-1], close[x-1])
+				low[x-1] = Math.min(instrument.low[x], open[x-1], close[x-1])
+			instrument.close = close
+			instrument.open = open
+			instrument.high = high
+			instrument.low = low
+			instrument.volumes = _.drop(instrument.volumes, 1)
+	return instrument
+
 processMA = (selector, period, instrument, secondary = false) ->
 	if secondary
 		sInstrument = ['low', 'high', 'close', 'volumes']
@@ -370,23 +392,7 @@ processMA = (selector, period, instrument, secondary = false) ->
 	else
 		sInstrument = instrument
 	
-	switch DATA_INPUT
-		when 'Close'
-			sInput = sInstrument.close
-		when 'Typical'
-			sInput = talib.TYPPRICE
-				high: sInstrument.high
-				low: sInstrument.low
-				close: sInstrument.close
-				startIdx: 0
-				endIdx: sInstrument.close.length-1
-		when 'Weighted'
-			sInput = talib.WCLPRICE
-				high: sInstrument.high
-				low: sInstrument.low
-				close: sInstrument.close
-				startIdx: 0
-				endIdx: sInstrument.close.length-1
+	sInput = sInstrument.close
 	
 	switch selector
 		when 'NONE'
@@ -1098,6 +1104,8 @@ handle: ->
 	
 	plot
 		Zero: 0
+	
+	instrument = makeInstrument(instrument)
 	
 	if SHORT_MA_T isnt 'NONE'
 		delta = makeDelta(instrument)
