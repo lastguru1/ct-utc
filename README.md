@@ -11,7 +11,7 @@ It is called "constructor", as there is no predefined behavior for this bot: alm
 ### Main Features
 Full list of features can be seen in the code comments, so this is a simplified list:
 
-* Comprehensive (and growing) set of Moving Averages (including EMA, KAMA, MAMA, HMA, FRAMA, Hilbert Transform, VWMA and many, many others) with configurable thresholds.
+* Comprehensive (and growing) set of Moving Averages (including EMA, KAMA, MAMA, HMA, FRAMA, ALMA, Hilbert Transform, VWMA and many, many others) with configurable thresholds.
 * Feedback based on an additional Moving Average and volume to improve responsiveness.
 * MACD with any Moving Averages.
 * Many oscillators: Stochastic, RSI, MFI, Laguerre-based LRSI/LMFI, Fisher Transform. Signal trigger based on early or late crossing of the configured threshold line.
