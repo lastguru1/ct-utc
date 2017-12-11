@@ -32,20 +32,22 @@ DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted'], '
 # T3 - Triple Exponential Moving Average (parameters: period, vFactor (0..1, default 0.7)
 # HMA - Hull Moving Average
 # EHMA - Exponential Hull Moving Average (same as HMA, but with EMA instead of WMA)
-# ZLEMA - Zero-lag EMA
+# ZLEMA - Zero-lag EMA (simple variant)
 # HT - Hilbert Transform - Instantaneous Trendline
 # Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
 # FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
-# WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA, but with WMA as its base)
+# ALMA - Arnaud Legoux Moving Average (parameters: period, offset (0..1, default 0.85)
+# WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA (not implemented), but with WMA as its base)
 # VWMA - Volume Weighted Moving Average
-# EVWMA - Elastic Volume Weighted Moving Average
+# EVWMA - Exponential Volume Weighted Moving Average (same as VWMA, but with EMA instead of SMA)
+# ElVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
-SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'EMA'
 SHORT_MA_P = params.add 'Short MA period or parameters', '12'
 
 # Long MA
-LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'EMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '26'
 
 # Feedback can be applied on the price data or MA used by MA calculations
@@ -58,7 +60,7 @@ LONG_MA_P = params.add 'Long MA period or parameters', '26'
 FEED_APPLY = params.addOptions 'Apply feedback to', ['Short MA price', 'Long MA price', 'Both prices', 'Short MA', 'Long MA', 'Both MA'], 'Long MA'
 FEED_DELTA_T = params.addOptions 'Feedback reduction type (NONE disables this feedback)', ['NONE', 'Division', 'Root', 'Logarithm'], 'NONE'
 FEED_DELTA_P = params.add 'Feedback reduction value', 1
-FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'SMA'
+FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'SMA'
 FEED_MA_P = params.add 'Feedback MA period or parameters', '10'
 
 # Volume normalization: Stochastic or Laguerre
@@ -69,7 +71,7 @@ FEED_VOLUME_W = params.add 'Volume feedback weight (0..1)', 0.2
 
 # MACD will calculate MA from the resulting ShortLongDelta (the result is MACD Signal line)
 # MACD will act on the ShortLongDelta crossing MACD Signal line, instead of Zero line
-MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'EMA'
+MACD_MA_T = params.addOptions 'MACD MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'EMA'
 MACD_MA_P = params.add 'MACD MA period or parameters', '9'
 
 # High and low thresholds in percentage of the closing price
@@ -87,7 +89,7 @@ LO_THRESHOLD = params.add 'Low threshold', -0.05
 OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Draw only', 'Regular', 'Thresholds', 'Zones', 'Reverse thresholds', 'Both', 'Wait for both'], 'NONE'
 
 # We may want to smooth the data before making an oscillator
-OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
+OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
 OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 
 # The following oscillators can be used:
@@ -102,7 +104,7 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # We may want to smooth the oscillator results a bit
-OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'WRainbow', 'VWMA', 'EVWMA'], 'NONE'
+OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
 OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
 # Oscillator normalization: Stochastic or Inverse Fisher Transformation
@@ -140,6 +142,8 @@ FT_PREV = 0
 FT_V1 = 0
 EV_LEN = 0
 EV_PREV = 0
+ALMA_LEN = 0
+ALMA_OFFSET = 0
 CURR_HI_THRESHOLD = 0
 CURR_LO_THRESHOLD = 0
 
@@ -299,6 +303,25 @@ FT = (n, i, instrument) ->
 	fish = (Math.exp(2*fish) - 1) / (Math.exp(2*fish) + 1)
 	fish = (fish + 1) * 50
 	return fish
+
+ALMA = (n, i, instrument) ->
+	if i < (ALMA_LEN - 1)
+		alen = i + 1
+	else
+		alen = ALMA_LEN
+	m = Math.floor(ALMA_OFFSET*(ALMA_LEN-1))
+	s = ALMA_LEN/6.0
+	dss = 2 * s * s
+	alma = 0
+	wSum = 0
+	for x in [(i - alen + 1)..i]
+		k = i - x
+		ki = (i - alen + 1) + k
+		dim = (k-m) * (k-m)
+		w = Math.exp(-dim/dss)
+		alma = alma + w * instrument[ki]
+		wSum = wSum + w
+	return alma / wSum
 
 FRAMA = (n, i, instrument) ->
 	switch DATA_INPUT
@@ -543,6 +566,18 @@ processMA = (selector, period, instrument, secondary = false) ->
 			for x in [0..sInstrument.high.length-1]
 				fInstrument[x] = {close: sInstrument.close[x], low: sInstrument.low[x], high: sInstrument.high[x]}
 			_.map(fInstrument, FRAMA)
+		when 'ALMA'
+			# ALMA period and offset
+			limits = "#{period}".split " "
+			if limits[0]?
+				ALMA_LEN = 1*limits[0]
+			else
+				ALMA_LEN = 16
+			if limits[1]?
+				ALMA_OFFSET = 1*limits[1]
+			else
+				ALMA_OFFSET = 0.85
+			_.map(sInput, ALMA)
 		when 'ZLEMA'
 			ema1 = talib.EMA
 				inReal: sInput
@@ -617,6 +652,27 @@ processMA = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sv.length-1
 		when 'EVWMA'
+			vp = talib.MULT
+				inReal0: sInput
+				inReal1: sInstrument.volumes
+				startIdx: 0
+				endIdx: sInput.length-1
+			svp = talib.EMA
+				inReal: vp
+				startIdx: 0
+				endIdx: vp.length-1
+				optInTimePeriod: period
+			sv = talib.EMA
+				inReal: sInstrument.volumes
+				startIdx: 0
+				endIdx: sInstrument.volumes.length-1
+				optInTimePeriod: period
+			talib.DIV
+				inReal0: svp
+				inReal1: sv
+				startIdx: 0
+				endIdx: sv.length-1
+		when 'ElVWMA'
 			EV_LEN = period
 			eInstrument = []
 			for x in [0..sInstrument.high.length-1]
