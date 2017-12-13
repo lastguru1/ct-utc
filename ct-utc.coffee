@@ -85,7 +85,7 @@ LO_THRESHOLD = params.add 'Low threshold', -0.05
 # We can use crossings and/or oscillator to detect opportunities.
 # Draw only - no oscillator trading - just draw it in the chart
 # Regular - trade with oscillator signals
-# Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within the thresholds
+# Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within its thresholds
 # Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
 # Reverse thresholds - if oscillator is outside its thresholds, allow buys or sells early - within the crossing thresholds
 # Both - only buy if crossing happened while in the respective oscillator position
@@ -115,11 +115,15 @@ OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT'], 'NONE'
 
 # What trigger to use for oscillator
-# Early: trigger once crossed
-# Extreme: trigger once change direction (provisional top/bottom) after crossing
-# Late: trigger when back within the bounds after crossing
-# NB: this has effect only if oscillator mode is "Regular" or "Thresholds"
+# Early: trigger once threshold is crossed
+# Extreme: trigger once change direction (provisional top/bottom) after crossing the threshold
+# Late: trigger when back within the bounds after crossing the threshold
+# NB: this has effect only if oscillator mode is "Regular" or "Thresholds" and oscillator MA crossing is not enabled
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
+
+# Another possibility is to use MA crossing for oscillator instead of threshold crossing (especially suggested for FT)
+OSC_MAC_T = params.addOptions 'Oscillator crossing MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
+OSC_MAC_P = params.add 'Oscillator crossing MA period or parameters', '14'
 
 # Stop loss is losses are higher than this percentage
 STOP_LOSS = params.add 'Stop loss % (0 for none)', 0
@@ -905,16 +909,27 @@ makeOsc = (instrument) ->
 	osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
 	osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 	osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
+	oscma = processMA(OSC_MAC_T, OSC_MAC_P, osc, true)
 	oscResult = _.last(osc)
+	oscmaResult = _.last(osc)
 	
 	storage.lastOscPos = storage.OscPos
-	if oscResult < OSC_THRESHOLD
-		storage.OscPos = 1
-	else if oscResult > (100 - OSC_THRESHOLD)
-		storage.OscPos = -1
+	if OSC_MAC_T is 'NONE'
+		if oscResult < OSC_THRESHOLD
+			storage.OscPos = 1
+		else if oscResult > (100 - OSC_THRESHOLD)
+			storage.OscPos = -1
+		else
+			storage.OscPos = 0
 	else
-		storage.OscPos = 0
-	return _.last(osc)
+		if oscResult < oscmaResult
+			storage.OscPos = 1
+		else if oscResult > oscmaResult
+			storage.OscPos = -1
+		else
+			storage.OscPos = 0
+	
+	return [oscResult, oscmaResult]
 
 getAction = (delta, osc) ->
 	dscore = 0
@@ -1048,6 +1063,8 @@ init: ->
 			color: 'orange'
 		Oscillator:
 			color: 'orange'
+		OscillatorMA:
+			color: 'red'
 		Score:
 			color: 'red'
 			secondary: true
@@ -1106,6 +1123,9 @@ handle: ->
 		Zero: 0
 	
 	instrument = makeInstrument(instrument)
+	delta = []
+	delta['deltaResult'] = 0
+	osc = 0
 	
 	if SHORT_MA_T isnt 'NONE'
 		delta = makeDelta(instrument)
@@ -1128,11 +1148,14 @@ handle: ->
 				MACD: delta.macdDelta
 	
 	if OSC_MODE isnt 'NONE'
-		osc = makeOsc(instrument)
+		[osc, oscma] = makeOsc(instrument)
 		plot
 			HighOsc: storage.oscHigh - OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			LowOsc: storage.oscLow + OSC_THRESHOLD * (storage.oscHigh - storage.oscLow) / 100
 			Oscillator: storage.oscLow + osc * (storage.oscHigh - storage.oscLow) / 100
+	if OSC_MAC_T isnt 'NONE'
+		plot
+			OscillatorMA: storage.oscLow + oscma * (storage.oscHigh - storage.oscLow) / 100
 	action = getAction(delta.deltaResult, osc)
 	storage.lastDelta = delta.deltaResult
 	storage.lastOsc = osc
