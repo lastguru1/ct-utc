@@ -14,7 +14,7 @@ Full list of features can be seen in the code comments, so this is a simplified 
 * Comprehensive (and growing) set of Moving Averages (including EMA, KAMA, MAMA, HMA, FRAMA, ALMA, Hilbert Transform, VWMA and many, many others) with configurable thresholds.
 * Feedback based on an additional Moving Average and volume to improve responsiveness.
 * MACD with any Moving Averages.
-* Many oscillators: Stochastic, RSI, MFI, Laguerre-based LRSI/LMFI, Fisher Transform. Signal trigger based on early or late crossing of the configured threshold line.
+* Many oscillators: Stochastic, RSI, MFI, Laguerre-based LRSI/LMFI, Fisher Transform. Signal trigger based on early or late crossing of the configured threshold line or, alternatively, based on crossing with its MA.
 * Stochastic and Inverse Fisher Transform can be used to normalize oscillators (for example, to get StochRSI and similar strategies). Both input and result for oscillators can be smoothed with Moving Averages.
 * Trading can be made just with crossing and/or oscillator signals, or they can combine signals for less false trades and better responsiveness (more combination algorithms to come).
 
