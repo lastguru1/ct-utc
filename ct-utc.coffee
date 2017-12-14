@@ -911,7 +911,7 @@ makeOsc = (instrument) ->
 	osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
 	oscma = processMA(OSC_MAC_T, OSC_MAC_P, osc, true)
 	oscResult = _.last(osc)
-	oscmaResult = _.last(osc)
+	oscmaResult = _.last(oscma)
 	
 	storage.lastOscPos = storage.OscPos
 	if OSC_MAC_T is 'NONE'
@@ -975,42 +975,50 @@ getAction = (delta, osc) ->
 			dscore = 0
 	
 	if OSC_MODE is 'Regular' or OSC_MODE is 'Thresholds'
-		switch OSC_TRIGGER
-			when 'Early'
-				if storage.OscPos is 1 and storage.lastOscPos isnt 1
-					oscore = 1
-				else if storage.OscPos is -1 and storage.lastOscPos isnt -1
-					oscore = -1
-				else
-					oscore = 0
-			when 'Extreme'
-				if storage.OscPos is 1 and storage.lastOsc <= osc
-					oscore = 1
-				else if storage.OscPos is -1 and storage.lastOsc >= osc
-					oscore = -1
-				else
-					oscore = 0
-			when 'Late'
-				if storage.OscPos isnt 1 and storage.lastOscPos is 1
-					oscore = 1
-				else if storage.OscPos isnt -1 and storage.lastOscPos is -1
-					oscore = -1
-				else
-					oscore = 0
-			when 'Buy early, sell late'
-				if storage.OscPos is 1 and storage.lastOscPos isnt 1
-					oscore = 1
-				else if storage.OscPos isnt -1 and storage.lastOscPos is -1
-					oscore = -1
-				else
-					oscore = 0
-			when 'Buy late, sell early'
-				if storage.OscPos isnt 1 and storage.lastOscPos is 1
-					oscore = 1
-				else if storage.OscPos is -1 and storage.lastOscPos isnt -1
-					oscore = -1
-				else
-					oscore = 0
+		if OSC_MAC_T is 'NONE'
+			switch OSC_TRIGGER
+				when 'Early'
+					if storage.OscPos is 1 and storage.lastOscPos isnt 1
+						oscore = 1
+					else if storage.OscPos is -1 and storage.lastOscPos isnt -1
+						oscore = -1
+					else
+						oscore = 0
+				when 'Extreme'
+					if storage.OscPos is 1 and storage.lastOsc <= osc
+						oscore = 1
+					else if storage.OscPos is -1 and storage.lastOsc >= osc
+						oscore = -1
+					else
+						oscore = 0
+				when 'Late'
+					if storage.OscPos isnt 1 and storage.lastOscPos is 1
+						oscore = 1
+					else if storage.OscPos isnt -1 and storage.lastOscPos is -1
+						oscore = -1
+					else
+						oscore = 0
+				when 'Buy early, sell late'
+					if storage.OscPos is 1 and storage.lastOscPos isnt 1
+						oscore = 1
+					else if storage.OscPos isnt -1 and storage.lastOscPos is -1
+						oscore = -1
+					else
+						oscore = 0
+				when 'Buy late, sell early'
+					if storage.OscPos isnt 1 and storage.lastOscPos is 1
+						oscore = 1
+					else if storage.OscPos is -1 and storage.lastOscPos isnt -1
+						oscore = -1
+					else
+						oscore = 0
+		else
+			if storage.OscPos isnt 1 and storage.lastOscPos is 1
+				oscore = 1
+			else if storage.OscPos isnt -1 and storage.lastOscPos is -1
+				oscore = -1
+			else
+				oscore = 0
 	
 	if OSC_MODE is 'Thresholds' and SHORT_MA_T isnt 'NONE' and storage.DeltaPos is 0
 		oscore = 0
