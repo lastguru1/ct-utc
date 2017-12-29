@@ -24,27 +24,27 @@ params = require 'params'
 DATA_INPUT = params.addOptions 'Data input', ['Close', 'Typical', 'Weighted', 'Heikin-Ashi'], 'Close'
 
 # The following MAs can be used:
-# SMA  - Simple Moving Average
-# EMA - Exponential Moving Average
-# WMA - Weighted Moving Average
-# DEMA - Double Exponential Moving Average
-# TEMA - Triple Exponential Moving Average
-# TRIMA - Triangular Moving Average
-# KAMA - Kaufman Adaptive Moving Average
-# MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
-# FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
-# T3 - Triple Exponential Moving Average (parameters: period, vFactor (0..1, default 0.7)
-# HMA - Hull Moving Average
-# EHMA - Exponential Hull Moving Average (same as HMA, but with EMA instead of WMA)
-# ZLEMA - Zero-lag EMA (simple variant)
-# HT - Hilbert Transform - Instantaneous Trendline
-# Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
-# FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
-# ALMA - Arnaud Legoux Moving Average (parameters: period, offset (0..1, default 0.85)
-# WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA (not implemented), but with WMA as its base)
-# VWMA - Volume Weighted Moving Average
-# EVWMA - Exponential Volume Weighted Moving Average (same as VWMA, but with EMA instead of SMA)
-# ElVWMA - Elastic Volume Weighted Moving Average
+#  SMA  - Simple Moving Average
+#  EMA - Exponential Moving Average
+#  WMA - Weighted Moving Average
+#  DEMA - Double Exponential Moving Average
+#  TEMA - Triple Exponential Moving Average
+#  TRIMA - Triangular Moving Average
+#  KAMA - Kaufman Adaptive Moving Average
+#  MAMA - MESA Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
+#  FAMA - Following Adaptive Moving Average (parameters: fast limit (0..1, Ehlers used 0.5), slow limit (0..1, Ehlers used 0.05))
+#  T3 - Triple Exponential Moving Average (parameters: period, vFactor (0..1, default 0.7)
+#  HMA - Hull Moving Average
+#  EHMA - Exponential Hull Moving Average (same as HMA, but with EMA instead of WMA)
+#  ZLEMA - Zero-lag EMA (simple variant)
+#  HT - Hilbert Transform - Instantaneous Trendline
+#  Laguerre - Four Element Laguerre Filter (parameter: gamma (0..1, Ehlers used 0.8))
+#  FRAMA - Fractal Adaptive Moving Average (parameters: length, slow period)
+#  ALMA - Arnaud Legoux Moving Average (parameters: period, offset (0..1, default 0.85)
+#  WRainbow - Weighted Rainbow Moving Average (similar to regular Rainbow MA (not implemented), but with WMA as its base)
+#  VWMA - Volume Weighted Moving Average
+#  EVWMA - Exponential Volume Weighted Moving Average (same as VWMA, but with EMA instead of SMA)
+#  ElVWMA - Elastic Volume Weighted Moving Average
 
 # Short MA. If you choose NONE, trading on crossings will be disabled
 SHORT_MA_T = params.addOptions 'Short MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'EMA'
@@ -53,6 +53,20 @@ SHORT_MA_P = params.add 'Short MA period or parameters', '12'
 # Long MA
 LONG_MA_T = params.addOptions 'Long MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'EMA'
 LONG_MA_P = params.add 'Long MA period or parameters', '26'
+
+# Dynamic period adjustment (based on DMI by Tushar Chande and Stanley Kroll) can be applied to the Long MA
+# period. It takes standard deviation over a number of ticks (5 by default) and divides it by an SMA of the
+# standard deviations (SMA period is 10 by default). The resulting quotient (volatility index) is used to
+# divide the given period, so higher volatility periods (SD > SMA(SD)) decrease the period and lower
+# volatility periods (SD < SMA(SD)) increase it. One can also set volatility index multiplier, so adjustment
+# effects are more (or less) pronounced, and a cutoff multiplier, so period doesn't get too long and too
+# short (3 by default, so if reference period is 14, the effective period is between 5 and 42)
+#  Momentum - calculate volatility index from price
+#  Volume - calculate volatility index from volume
+#  Both - calculate volatility index from price*volume
+# Parameters: SD period (5 by default), SMA period (10 by default), multiplier (1 by default), cutoff (3 by default)
+LONG_DMI_T = params.addOptions 'Dynamic period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
+LONG_DMI_P = params.add 'Dynamic period parameters', '5 10 1 3'
 
 # Feedback can be applied on the price data or MA used by MA calculations
 # Feedback works like that:
@@ -67,7 +81,9 @@ FEED_DELTA_P = params.add 'Feedback reduction value', 1
 FEED_MA_T = params.addOptions 'Feedback MA type', ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'SMA'
 FEED_MA_P = params.add 'Feedback MA period or parameters', '10'
 
-# Volume normalization: Stochastic or Laguerre
+# Volume normalization:
+#  Laguerre
+#  Stochastic
 # Volume is then normalized to (1-weight)..1 and serve as a multiplicator for the delta
 FEED_VOLUME_T = params.addOptions 'Volume feedback normalization', ['NONE', 'Stochastic', 'Laguerre'], 'NONE'
 FEED_VOLUME_P = params.add 'Volume feedback period (gamma (0..1) for Laguerre)', '14'
@@ -83,13 +99,13 @@ HI_THRESHOLD = params.add 'High threshold', 0.075
 LO_THRESHOLD = params.add 'Low threshold', -0.05
 
 # We can use crossings and/or oscillator to detect opportunities.
-# Draw only - no oscillator trading - just draw it in the chart
-# Regular - trade with oscillator signals
-# Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within its thresholds
-# Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
-# Reverse thresholds - if oscillator is outside its thresholds, allow buys or sells early - within the crossing thresholds
-# Both - only buy if crossing happened while in the respective oscillator position
-# Wait for both - trade once both crossing and oscillator are in a position
+#  Draw only - no oscillator trading - just draw it in the chart
+#  Regular - trade with oscillator signals
+#  Thresholds - same as Regular, but disables oscillator trade signals if MA delta is within its thresholds
+#  Zones - disallows buys if oscillator is high, and disallows sells if oscillator is low
+#  Reverse thresholds - if oscillator is outside its thresholds, allow buys or sells early - within the crossing thresholds
+#  Both - only buy if crossing happened while in the respective oscillator position
+#  Wait for both - trade once both crossing and oscillator are in a position
 OSC_MODE = params.addOptions 'Oscillator mode', ['NONE', 'Draw only', 'Regular', 'Thresholds', 'Zones', 'Reverse thresholds', 'Both', 'Wait for both'], 'NONE'
 
 # We may want to smooth the data before making an oscillator
@@ -97,33 +113,37 @@ OSC_MAP_T = params.addOptions 'Oscillator preprocessing MA type', ['NONE', 'SMA'
 OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 
 # The following oscillators can be used:
-# Stochastic - Stochastic oscillator
-# RSI - Relative Strength Index
-# MFI - Money Flow Index (same as RSI, but including volume data, so more responsive to large trades)
-# uRSI - Unsmoothed RSI with optional lookback (RMI) (parameter: period, lookback (1 by default))
-# uMFI - Unsmoothed MFI with optional lookback (RMI) (parameter: period, lookback (1 by default))
-# LRSI - Laguerre Relative Strength Index (RSI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
-# LMFI - Laguerre Money Flow Index (MFI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
-# FT - Fisher Transform, compressed with Inverse Fisher Transformation (parameters: period, gamma (0..1, Ehlers used 0.33))
+#  Stochastic - Stochastic oscillator
+#  RSI - Relative Strength Index
+#  MFI - Money Flow Index (same as RSI, but including volume data, so more responsive to large trades)
+#  uRSI - Unsmoothed RSI with optional lookback (RMI) (parameter: period, lookback (1 by default))
+#  uMFI - Unsmoothed MFI with optional lookback (RMI) (parameter: period, lookback (1 by default))
+#  LRSI - Laguerre Relative Strength Index (RSI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
+#  LMFI - Laguerre Money Flow Index (MFI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
+#  FT - Fisher Transform, compressed with Inverse Fisher Transformation (parameters: period, gamma (0..1, Ehlers used 0.33))
 OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'uRSI', 'uMFI', 'LRSI', 'LMFI', 'FT'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
+
+# Dynamic period adjustment can be applied to the oscillator period as well. Parameters are identical
+OSC_DMI_T = params.addOptions 'Dynamic period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
+OSC_DMI_P = params.add 'Dynamic period parameters', '5 10 1 3'
 
 # We may want to smooth the oscillator results a bit
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
 OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
 # Oscillator normalization:
-# Stochastic
-# Inverse Fisher Transformation
-# Standard Deviation stretch (parameters: period, deviation multiplier (1 by default))
+#  Stochastic
+#  Inverse Fisher Transformation
+#  Standard Deviation stretch (parameters: period, deviation multiplier (1 by default))
 OSC_NORM_T = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT', 'Standard Deviation'], 'NONE'
 OSC_NORM_P = params.add 'Oscillator normalization period', '14'
 
 # What trigger to use for oscillator
-# Early: trigger once threshold is crossed
-# Extreme: trigger once change direction (provisional top/bottom) after crossing the threshold
-# Late: trigger when back within the bounds after crossing the threshold
+#  Early - trigger once threshold is crossed
+#  Extreme - trigger once change direction (provisional top/bottom) after crossing the threshold
+#  Late - trigger when back within the bounds after crossing the threshold
 # NB: this has effect only if oscillator mode is "Regular" or "Thresholds" and oscillator MA crossing is not enabled
 OSC_TRIGGER = params.addOptions 'Oscillator trigger', ['Early', 'Extreme', 'Late', 'Buy early, sell late', 'Buy late, sell early'], 'Late'
 
