@@ -100,10 +100,12 @@ OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 # Stochastic - Stochastic oscillator
 # RSI - Relative Strength Index
 # MFI - Money Flow Index (same as RSI, but including volume data, so more responsive to large trades)
+# uRSI - Unsmoothed RSI with optional lookback (RMI) (parameter: period, lookback (1 by default))
+# uMFI - Unsmoothed MFI with optional lookback (RMI) (parameter: period, lookback (1 by default))
 # LRSI - Laguerre Relative Strength Index (RSI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
 # LMFI - Laguerre Money Flow Index (MFI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
 # FT - Fisher Transform, compressed with Inverse Fisher Transformation (parameters: period, gamma (0..1, Ehlers used 0.33))
-OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'LRSI', 'LMFI', 'FT'], 'MFI'
+OSC_TYPE = params.addOptions 'Oscillator type', ['Stochastic', 'RSI', 'MFI', 'uRSI', 'uMFI', 'LRSI', 'LMFI', 'FT'], 'MFI'
 OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
@@ -111,8 +113,12 @@ OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
 OSC_MA_P = params.add 'Oscillator MA period or parameters', '0'
 
-# Oscillator normalization: Stochastic or Inverse Fisher Transformation
-OSC_NORM = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT'], 'NONE'
+# Oscillator normalization:
+# Stochastic
+# Inverse Fisher Transformation
+# Standard Deviation stretch (parameters: period, deviation multiplier (1 by default))
+OSC_NORM_T = params.addOptions 'Oscillator normalization', ['NONE', 'Stochastic', 'IFT', 'Standard Deviation'], 'NONE'
+OSC_NORM_P = params.add 'Oscillator normalization period', '14'
 
 # What trigger to use for oscillator
 # Early: trigger once threshold is crossed
@@ -144,6 +150,8 @@ FRAMA_LEN = 0
 FRAMA_SLOW = 0
 FRAMA_PREV = 0
 STOCH_LEN = 0
+URSI_LEN = 0
+URSI_LB = 0
 FT_LEN = 0
 FT_GAMMA = 1
 FT_PREV = 0
@@ -154,6 +162,9 @@ ALMA_LEN = 0
 ALMA_OFFSET = 0
 CURR_HI_THRESHOLD = 0
 CURR_LO_THRESHOLD = 0
+
+feedbackAbs = (n) ->
+	return Math.abs(n)
 
 feedbackSign = (n) ->
 	return Math.sign(n)
@@ -232,6 +243,24 @@ LaguerreRSI = (n, i) ->
 	else
 		lrsi = 100 * cu / (cu + cd)
 	return lrsi
+
+uRSI = (n, i, instrument) ->
+	if i < URSI_LB
+		return 100
+	if i < URSI_LEN + URSI_LB
+		len = i
+	else
+		len = URSI_LEN
+	sd = 0
+	su = 0
+	for x in [(i - len + URSI_LB)..i]
+		if instrument.close[x] > instrument.close[x-URSI_LB] then su = su + instrument.close[x] - instrument.close[x-URSI_LB]
+		if instrument.close[x] < instrument.close[x-URSI_LB] then sd = sd + instrument.close[x-URSI_LB] - instrument.close[x]
+	if (su + sd) is 0
+		rsi = 0
+	else
+		rsi = 100 * su / (su + sd)
+	return rsi
 
 Stochastic = (n, i, instrument) ->
 	price = n.close
@@ -739,6 +768,36 @@ processOSC = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sInstrument.close.length-1
 				optInTimePeriod: period
+		when 'uRSI'
+			# RSI period and lookback
+			limits = "#{period}".split " "
+			if limits[0]?
+				URSI_LEN = limits[0]
+			else
+				URSI_LEN = 14
+			if limits[1]? and limits[1] < 1
+				URSI_LB = limits[1]
+			else
+				URSI_LB = 1
+			price = processMA('NONE', 0, sInstrument)
+			_.map(price, uRSI)		
+		when 'uMFI'
+			# RSI period and lookback
+			limits = "#{period}".split " "
+			if limits[0]?
+				URSI_LEN = limits[0]
+			else
+				URSI_LEN = 14
+			if limits[1]? and limits[1] < 1
+				URSI_LB = limits[1]
+			else
+				URSI_LB = 1
+			price = talib.MULT
+				inReal0: processMA('NONE', 0, sInstrument)
+				inReal1: sInstrument.volumes
+				startIdx: 0
+				endIdx: sInstrument.volumes.length-1
+			_.map(price, uRSI)
 		when 'LRSI'
 			LGAMMA = period
 			price = processMA('NONE', 0, sInstrument)
@@ -751,6 +810,44 @@ processOSC = (selector, period, instrument, secondary = false) ->
 				startIdx: 0
 				endIdx: sInstrument.volumes.length-1
 			_.map(price, LaguerreRSI)
+		when 'Standard Deviation'
+			# Standard deviation period and multiplier
+			limits = "#{period}".split " "
+			if limits[0]?
+				sdLen = limits[0]
+			else
+				sdLen = 14
+			if limits[1]? and limits[1] < 1
+				sdMul = limits[1]
+			else
+				sdMul = 1
+			price = processMA('NONE', 0, sInstrument)
+			bbands = talib.BBANDS
+				inReal: price
+				startIdx: 0
+				endIdx: sInstrument.close.length-1
+				optInTimePeriod: sdLen
+				optInNbDevUp: sdMul
+				optInNbDevDn: sdMul
+			sd = talib.SUB
+				inReal0: price
+				inReal1: bbands.outRealLowerBand
+				startIdx: 0
+				endIdx: price.length-1
+			uband = talib.SUB
+				inReal0: bbands.outRealUpperBand
+				inReal1: bbands.outRealLowerBand
+				startIdx: 0
+				endIdx: price.length-1
+			sd = talib.DIV
+				inReal0: sd
+				inReal1: uband
+				startIdx: 0
+				endIdx: price.length-1
+			REDUCE_BY = 100 - 2*OSC_THRESHOLD
+			sd = _.map(sd, feedbackMultiply)
+			REDUCE_BY = OSC_THRESHOLD
+			_.map(sd, feedbackAdd)
 
 makeDelta = (instrument) ->
 	delta = []
@@ -908,7 +1005,7 @@ makeOsc = (instrument) ->
 		sInstrument = instrument
 	osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
 	osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
-	osc = processOSC(OSC_NORM, OSC_PERIOD, osc, true)
+	osc = processOSC(OSC_NORM_T, OSC_NORM_P, osc, true)
 	oscma = processMA(OSC_MAC_T, OSC_MAC_P, osc, true)
 	oscResult = _.last(osc)
 	oscmaResult = _.last(oscma)
