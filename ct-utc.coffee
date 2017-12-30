@@ -65,8 +65,8 @@ LONG_MA_P = params.add 'Long MA period or parameters', '26'
 #  Volume - calculate volatility index from volume
 #  Both - calculate volatility index from price*volume
 # Parameters: SD period (5 by default), SMA period (10 by default), multiplier (1 by default), cutoff (3 by default)
-LONG_DMI_T = params.addOptions 'Dynamic period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
-LONG_DMI_P = params.add 'Dynamic period parameters', '5 10 1 3'
+LONG_DMI_T = params.addOptions 'Dynamic Long MA period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
+LONG_DMI_P = params.add 'Dynamic Long MA period parameters', '5 10 1 3'
 
 # Feedback can be applied on the price data or MA used by MA calculations
 # Feedback works like that:
@@ -126,8 +126,8 @@ OSC_THRESHOLD = params.add 'Oscillator cutoff', 20
 OSC_PERIOD = params.add 'Oscillator period (gamma (0..1) for Laguerre)', '14'
 
 # Dynamic period adjustment can be applied to the oscillator period as well. Parameters are identical
-OSC_DMI_T = params.addOptions 'Dynamic period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
-OSC_DMI_P = params.add 'Dynamic period parameters', '5 10 1 3'
+OSC_DMI_T = params.addOptions 'Dynamic oscillator period type', ['NONE', 'Momentum', 'Volume', 'Both'], 'NONE'
+OSC_DMI_P = params.add 'Dynamic oscillator period parameters', '5 10 1 3'
 
 # We may want to smooth the oscillator results a bit
 OSC_MA_T = params.addOptions 'Oscillator MA type', ['NONE', 'SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'TRIMA', 'KAMA', 'MAMA', 'FAMA', 'T3', 'HMA', 'EHMA', 'ZLEMA', 'HT', 'Laguerre', 'FRAMA', 'ALMA', 'WRainbow', 'VWMA', 'EVWMA', 'ElVWMA'], 'NONE'
@@ -286,8 +286,8 @@ uRSI = (n, i, instrument) ->
 	sd = 0
 	su = 0
 	for x in [(i - len + URSI_LB)..i]
-		if instrument.close[x] > instrument.close[x-URSI_LB] then su = su + instrument.close[x] - instrument.close[x-URSI_LB]
-		if instrument.close[x] < instrument.close[x-URSI_LB] then sd = sd + instrument.close[x-URSI_LB] - instrument.close[x]
+		if instrument[x] > instrument[x-URSI_LB] then su = su + instrument[x] - instrument[x-URSI_LB]
+		if instrument[x] < instrument[x-URSI_LB] then sd = sd + instrument[x-URSI_LB] - instrument[x]
 	if (su + sd) is 0
 		rsi = 0
 	else
@@ -404,7 +404,7 @@ sigRound = (n, sig) ->
 	mult = Math.pow(10, sig - Math.floor(Math.log(n) / Math.LN10) - 1)
 	Math.round(n * mult) / mult
 
-dynamicPeriod = (instrument, period, type, sdp, smap, multi, cutoff) ->
+dynamicPeriod = (instrument, period, type, sdp, smap, multi, cutoff, inverse = false) ->
 	switch type
 		when 'NONE'
 			return period
@@ -418,6 +418,11 @@ dynamicPeriod = (instrument, period, type, sdp, smap, multi, cutoff) ->
 				inReal1: instrument.volumes
 				startIdx: 0
 				endIdx: instrument.close.length-1
+	limits = "#{period}".split " "
+	if limits[0]?
+		period = limits[0]
+	else
+		period = 0
 	sd = talib.STDDEV
 		inReal: price
 		startIdx: 0
@@ -430,11 +435,16 @@ dynamicPeriod = (instrument, period, type, sdp, smap, multi, cutoff) ->
 		endIdx: sd.length-1
 		optInTimePeriod: smap
 	dp = sd[sd.length-1] / ma[ma.length-1]
-	if dp > period * cutoff
-		dp = period * cutoff
-	if dp < period / cutoff
-		dp = period / cutoff
-	return dp
+	if dp > cutoff
+		dp = cutoff
+	if dp < 1 / cutoff
+		dp = 1 / cutoff
+	if inverse
+		dp = period * dp
+	else
+		dp = period / dp
+	limits[0] = Math.round(dp)
+	return limits.join(" ")
 
 makeInstrument = (instrument) ->
 	switch DATA_INPUT
