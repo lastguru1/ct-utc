@@ -116,8 +116,8 @@ OSC_MAP_P = params.add 'Oscillator preprocessing MA period or parameters', '0'
 #  Stochastic - Stochastic oscillator
 #  RSI - Relative Strength Index
 #  MFI - Money Flow Index (same as RSI, but including volume data, so more responsive to large trades)
-#  uRSI - Unsmoothed RSI with optional lookback (RMI) (parameter: period, lookback (1 by default))
-#  uMFI - Unsmoothed MFI with optional lookback (RMI) (parameter: period, lookback (1 by default))
+#  uRSI - Unsmoothed RSI (should be smoothed later) with optional lookback (RMI) (parameter: period, lookback (1 by default))
+#  uMFI - Unsmoothed MFI (should be smoothed later) with optional lookback (RMI) (parameter: period, lookback (1 by default))
 #  LRSI - Laguerre Relative Strength Index (RSI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
 #  LMFI - Laguerre Money Flow Index (MFI with Four Element Laguerre Filter) (parameter: gamma (0..1, Ehlers used 0.5))
 #  FT - Fisher Transform, compressed with Inverse Fisher Transformation (parameters: period, gamma (0..1, Ehlers used 0.33))
@@ -210,6 +210,18 @@ fixLength = (first, second) ->
 	if second.length > first.length
 		second = _.drop(second, second.length - first.length)
 	return [first, second]
+
+rememberLong = (long) ->
+	storage.rlong ?= long
+	storage.rlong = _.drop(storage.rlong, 1)
+	storage.rlong[storage.rlong.length] = _.last(long)
+	return storage.rlong
+
+rememberOSC = (osc) ->
+	storage.rosc ?= osc
+	storage.rosc = _.drop(storage.rosc, 1)
+	storage.rosc[storage.rosc.length] = _.last(osc)
+	return storage.rosc
 
 EVWMA = (n, i, instrument) ->
 	if i is 0
@@ -391,6 +403,38 @@ FRAMA = (n, i, instrument) ->
 sigRound = (n, sig) ->
 	mult = Math.pow(10, sig - Math.floor(Math.log(n) / Math.LN10) - 1)
 	Math.round(n * mult) / mult
+
+dynamicPeriod = (instrument, period, type, sdp, smap, multi, cutoff) ->
+	switch type
+		when 'NONE'
+			return period
+		when 'Momentum'
+			price = instrument.close
+		when 'Volume'
+			price = instrument.volumes
+		when 'Both'
+			price = talib.MULT
+				inReal0: instrument.close
+				inReal1: instrument.volumes
+				startIdx: 0
+				endIdx: instrument.close.length-1
+	sd = talib.STDDEV
+		inReal: price
+		startIdx: 0
+		endIdx: price.length-1
+		optInTimePeriod: sdp
+		optInNbDev: multi
+	ma = talib.SMA
+		inReal: sd
+		startIdx: 0
+		endIdx: sd.length-1
+		optInTimePeriod: smap
+	dp = sd[sd.length-1] / ma[ma.length-1]
+	if dp > period * cutoff
+		dp = period * cutoff
+	if dp < period / cutoff
+		dp = period / cutoff
+	return dp
 
 makeInstrument = (instrument) ->
 	switch DATA_INPUT
@@ -845,7 +889,7 @@ processOSC = (selector, period, instrument, secondary = false) ->
 			bbands = talib.BBANDS
 				inReal: price
 				startIdx: 0
-				endIdx: sInstrument.close.length-1
+				endIdx: price.length-1
 				optInTimePeriod: sdLen
 				optInNbDevUp: sdMul
 				optInNbDevDn: sdMul
@@ -870,6 +914,28 @@ processOSC = (selector, period, instrument, secondary = false) ->
 			_.map(sd, feedbackAdd)
 
 makeDelta = (instrument) ->
+	if LONG_DMI_T is 'NONE'
+		long_p = LONG_MA_P
+	else
+		# OSC Dynamic period: SD period, SMA period, multiplier, cutoff
+		limits = "#{LONG_DMI_P}".split " "
+		if limits[0]?
+			sdp = 1*limits[0]
+		else
+			sdp = 5
+		if limits[1]?
+			smap = 1*limits[1]
+		else
+			sdp = 10
+		if limits[2]?
+			multi = 1*limits[2]
+		else
+			multi = 1
+		if limits[3]?
+			cutoff = 1*limits[3]
+		else
+			cutoff = 3
+		long_p = dynamicPeriod(instrument, LONG_MA_P, LONG_DMI_T, sdp, smap, multi, cutoff)
 	delta = []
 	short = processMA(SHORT_MA_T, SHORT_MA_P, instrument)
 	if FEED_DELTA_T isnt 'NONE'
@@ -919,7 +985,8 @@ makeDelta = (instrument) ->
 					startIdx: 0
 					endIdx: feedDelta.length-1
 				short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
-				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				long = processMA(LONG_MA_T, long_p, instrument)
+				long = rememberLong(long)
 				delta['correctedPrice'] = _.last(lInput)
 			when 'Long MA price'
 				lInput = processMA('NONE', 0, instrument)
@@ -929,7 +996,8 @@ makeDelta = (instrument) ->
 					inReal1: feedDelta
 					startIdx: 0
 					endIdx: feedDelta.length-1
-				long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+				long = processMA(LONG_MA_T, long_p, lInput, true)
+				long = rememberLong(long)
 				delta['correctedPrice'] = _.last(lInput)
 			when 'Both MA prices'
 				lInput = processMA('NONE', 0, instrument)
@@ -940,7 +1008,8 @@ makeDelta = (instrument) ->
 					startIdx: 0
 					endIdx: feedDelta.length-1
 				short = processMA(SHORT_MA_T, SHORT_MA_P, lInput, true)
-				long = processMA(LONG_MA_T, LONG_MA_P, lInput, true)
+				long = processMA(LONG_MA_T, long_p, lInput, true)
+				long = rememberLong(long)
 				delta['correctedPrice'] = _.last(lInput)
 			when 'Short MA'
 				[short, feedDelta] = fixLength(short, feedDelta)
@@ -949,9 +1018,11 @@ makeDelta = (instrument) ->
 					inReal1: feedDelta
 					startIdx: 0
 					endIdx: feedDelta.length-1
-				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				long = processMA(LONG_MA_T, long_p, instrument)
+				long = rememberLong(long)
 			when 'Long MA'
-				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				long = processMA(LONG_MA_T, long_p, instrument)
+				long = rememberLong(long)
 				[long, feedDelta] = fixLength(long, feedDelta)
 				long = talib.ADD
 					inReal0: long
@@ -965,7 +1036,8 @@ makeDelta = (instrument) ->
 					inReal1: feedDelta
 					startIdx: 0
 					endIdx: feedDelta.length-1
-				long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+				long = processMA(LONG_MA_T, long_p, instrument)
+				long = rememberLong(long)
 				[long, feedDelta] = fixLength(long, feedDelta)
 				long = talib.ADD
 					inReal0: long
@@ -973,7 +1045,8 @@ makeDelta = (instrument) ->
 					startIdx: 0
 					endIdx: feedDelta.length-1
 	else
-		long = processMA(LONG_MA_T, LONG_MA_P, instrument)
+		long = processMA(LONG_MA_T, long_p, instrument)
+		long = rememberLong(long)
 	
 	[long, short] = fixLength(long, short)
 	shortLongDelta = talib.SUB
@@ -1023,7 +1096,30 @@ makeOsc = (instrument) ->
 		sInstrument.volumes = _.drop(sInstrument.volumes, sInstrument.volumes.length - osc.length)
 	else
 		sInstrument = instrument
-	osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
+	if OSC_DMI_T is 'NONE'
+		osc = processOSC(OSC_TYPE, OSC_PERIOD, sInstrument)
+	else
+		# OSC Dynamic period: SD period, SMA period, multiplier, cutoff
+		limits = "#{OSC_DMI_P}".split " "
+		if limits[0]?
+			sdp = 1*limits[0]
+		else
+			sdp = 5
+		if limits[1]?
+			smap = 1*limits[1]
+		else
+			sdp = 10
+		if limits[2]?
+			multi = 1*limits[2]
+		else
+			multi = 1
+		if limits[3]?
+			cutoff = 1*limits[3]
+		else
+			cutoff = 3
+		osc_p = dynamicPeriod(instrument, OSC_PERIOD, OSC_DMI_T, sdp, smap, multi, cutoff)
+		osc = processOSC(OSC_TYPE, osc_p, sInstrument)
+		osc = rememberOSC(osc)
 	osc = processMA(OSC_MA_T, OSC_MA_P, osc, true)
 	osc = processOSC(OSC_NORM_T, OSC_NORM_P, osc, true)
 	oscma = processMA(OSC_MAC_T, OSC_MAC_P, osc, true)
